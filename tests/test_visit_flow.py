@@ -46,7 +46,9 @@ def test_flujo_completo_entrada_salida(client):
 def test_qr_alterado_rechazado(client):
     login(client, "residente1")
     j = _crear_visita(client, "Visita Alterada")
-    token_malo = j["token"][:-1] + ("A" if j["token"][-1] != "A" else "B")
+    token = j["token"]
+    # alterar un carácter del medio: el último puede decodificar igual en base64
+    token_malo = token[:2] + ("X" if token[2] != "X" else "Y") + token[3:]
 
     login(client, "guarda1")
     r = client.post("/api/scan", json={"token": token_malo, "action": "entrada"})

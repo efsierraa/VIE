@@ -8,9 +8,10 @@ def test_token_valido():
 
 def test_token_alterado():
     token = sign_visit("abc-123")
-    ultimo = token[-1]
-    alterado = token[:-1] + ("A" if ultimo != "A" else "B")
+    # alterar un carácter del medio: el último puede decodificar igual en base64
+    alterado = token[:2] + ("X" if token[2] != "X" else "Y") + token[3:]
     assert verify_token(alterado) is None
+    assert verify_token("garbage") is None
 
 
 def test_token_basura():
