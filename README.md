@@ -47,14 +47,32 @@ Abrir http://127.0.0.1:8000
 
 ## Despliegue gratuito
 
-1. Crear una base **Postgres gratuita** (Neon, Supabase o Render) → copiar la URL interna.
-2. Crear un **Web Service** en Render/Railway/Fly conectado al repo:
-   - Build: `pip install -r requirements.txt`
-   - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - Env vars: `VIE_DATABASE_URL`, `VIE_SECRET`, `VIE_COOKIE_SECURE=1`
-3. Ejecutar `seed_admin.py` una vez con la URL de producción para crear el admin.
+El repo incluye [`render.yaml`](render.yaml): Render lee ese archivo y crea el servicio solo. La base de datos va en **Neon** (Postgres gratuito permanente).
 
-HTTPS queda incluido, así que la cámara del guarda funciona.
+### Paso 1 — Base de datos en Neon
+
+1. Crea cuenta en [neon.tech](https://neon.tech) (gratis, sin tarjeta)
+2. Crea un proyecto y copia el **connection string** (se ve así: `postgresql://usuario:clave@ep-xxx.aws.neon.tech/neondb?sslmode=require`)
+
+### Paso 2 — Crear el servicio en Render
+
+1. Entra a [dashboard.render.com](https://dashboard.render.com) con tu cuenta de GitHub
+2. **New + → Blueprint** → selecciona el repo `efsierraa/VIE`
+3. Render leerá `render.yaml` y pedirá el valor de `VIE_DATABASE_URL` → pega la URL de Neon
+4. **Apply** → primera compilación (~2 min). HTTPS incluido, así que la cámara del guarda funciona.
+
+También puedes usar el botón: [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/efsierraa/VIE)
+
+### Paso 3 — Crear el administrador
+
+Desde tu PC, apuntando a la base de producción:
+
+```powershell
+$env:VIE_DATABASE_URL = "postgresql://...neon.tech/neondb?sslmode=require"
+.venv\Scripts\python seed_admin.py --usuario admin --clave una-clave-segura --nombre "Administración"
+```
+
+Listo: entra a `https://vie-XXXX.onrender.com` con esa cuenta y crea los residentes y guardas desde la pantalla de administración.
 
 ## Tests
 

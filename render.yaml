@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vie
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: VIE_SECRET
+        generateValue: true
+      - key: VIE_COOKIE_SECURE
+        value: "1"
+      - key: VIE_DATABASE_URL
+        sync: false  # pega aquí tu URL de Postgres (Neon: postgresql://...)
