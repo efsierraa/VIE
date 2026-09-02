@@ -93,6 +93,7 @@ form.addEventListener("submit", async (e) => {
   document.getElementById("token").textContent = j.token;
   document.getElementById("short-code").textContent = j.visit.short_code;
   document.getElementById("btn-download").href = j.qr_data_uri;
+  document.getElementById("btn-download").download = "pase-vie-" + j.visit.short_code + ".png";
   const v = j.visit;
   const text = "Pase de ingreso VIE\n" +
     "Visitante: " + v.visitor_name + "\n" +
