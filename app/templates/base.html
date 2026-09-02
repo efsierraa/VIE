@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}VIE{% endblock %}</title>
+<meta name="theme-color" content="#2e7d32">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">VIE</a>
+  <nav>
+    {% if user %}
+    <span class="chip role-{{ user.role }}">{{ user.full_name }} · {{ user.role }}</span>
+    <a class="link" href="/logout">Salir</a>
+    {% endif %}
+  </nav>
+</header>
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<footer class="foot">VIE — software libre (MIT) · hecho con el corazón</footer>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

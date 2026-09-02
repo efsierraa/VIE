@@ -1,0 +1,14 @@
+{
+  "name": "VIE — Vigilancia de Ingresos y Egresos",
+  "short_name": "VIE",
+  "description": "Control de acceso residencial con QR de un solo uso",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f5",
+  "theme_color": "#2e7d32",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

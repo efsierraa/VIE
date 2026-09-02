@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Ingresar — VIE{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Ingresar</h1>
+  {% if error %}<p class="alert error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login" class="form">
+    <label>Usuario <input name="username" required autofocus autocomplete="username"></label>
+    <label>Clave <input name="password" type="password" required autocomplete="current-password"></label>
+    <button type="submit">Entrar</button>
+  </form>
+  <p class="hint">Solo residentes, celadores y administración usan la app. Los visitantes solo muestran su QR.</p>
+</section>
+{% endblock %}

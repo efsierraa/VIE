@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Residente — VIE{% endblock %}
+{% block content %}
+<h1>Nueva visita</h1>
+<section class="card">
+  <form id="visit-form" class="form">
+    <label>Nombre del visitante <input name="visitor_name" required placeholder="Ej: Juan Pérez"></label>
+    <label>Asunto <input name="subject" required placeholder="Ej: visita familiar, entrega de domo"></label>
+    <label>Identificación (opcional) <input name="id_number" placeholder="Cédula"></label>
+    <label>Rol
+      <select name="visitor_role">
+        <option value="visitante">Visitante</option>
+        <option value="domiciliario">Domiciliario</option>
+      </select>
+    </label>
+    <label>Vigencia del QR
+      <select name="hours">
+        <option value="2">2 horas</option>
+        <option value="4">4 horas</option>
+        <option value="8">8 horas</option>
+        <option value="12" selected>12 horas</option>
+        <option value="24">24 horas</option>
+      </select>
+    </label>
+    <button type="submit">Generar QR</button>
+  </form>
+</section>
+
+<section id="result" class="card hidden">
+  <h2>Pase listo para enviar</h2>
+  <div class="qr-box"><img id="qr-img" alt="QR de ingreso"></div>
+  <p class="hint">El QR es de un solo uso. El celador lo escanea a la entrada y, si quiere, marca la salida.</p>
+  <p><code id="token" class="token"></code></p>
+  <div class="row">
+    <button id="btn-copy" type="button">Copiar código</button>
+    <button id="btn-share" type="button">Compartir</button>
+    <a id="btn-wa" class="button" target="_blank" rel="noopener">WhatsApp</a>
+  </div>
+</section>
+
+<h1>Mis visitas</h1>
+<section class="card">
+  {% if visits %}
+  <table>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Estado</th><th>Creada</th><th>Vence</th><th></th></tr></thead>
+    <tbody>
+    {% for v in visits %}
+      <tr>
+        <td>{{ v.visitor_name }}<br><small>{{ v.visitor_role }}</small></td>
+        <td>{{ v.subject }}</td>
+        <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
+        <td>{{ v.created_at|dt }}</td>
+        <td>{{ v.expires_at|dt }}</td>
+        <td>{% if v.status == "pendiente" %}<button class="small danger" data-cancel="{{ v.uuid }}">Cancelar</button>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Aún no has creado visitas.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const form = document.getElementById("visit-form");
+const result = document.getElementById("result");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form).entries());
+  data.hours = parseInt(data.hours, 10);
+  const r = await fetch("/api/visits", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+  const j = await r.json();
+  if (!r.ok) { alert(j.detail || "Error creando la visita"); return; }
+  document.getElementById("qr-img").src = j.qr_data_uri;
+  document.getElementById("token").textContent = j.token;
+  const v = j.visit;
+  const text = "Pase de ingreso VIE\n" +
+    "Visitante: " + v.visitor_name + "\n" +
+    "Asunto: " + v.subject + "\n" +
+    "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
+    "Un solo uso. Muestra este código en portería:\n" + j.token;
+  document.getElementById("btn-share").onclick = () => {
+    if (navigator.share) navigator.share({title: "Pase VIE", text}).catch(() => {});
+    else { navigator.clipboard.writeText(text); alert("Código copiado; pégalo en cualquier app."); }
+  };
+  document.getElementById("btn-wa").href = "https://wa.me/?text=" + encodeURIComponent(text);
+  result.classList.remove("hidden");
+  result.scrollIntoView({behavior: "smooth"});
+  form.reset();
+});
+
+document.getElementById("btn-copy").onclick = () => {
+  navigator.clipboard.writeText(document.getElementById("token").textContent);
+};
+
+document.querySelectorAll("[data-cancel]").forEach(btn => btn.addEventListener("click", async () => {
+  if (!confirm("¿Cancelar esta visita?")) return;
+  const r = await fetch("/api/visits/" + btn.dataset.cancel + "/cancel", {method: "POST"});
+  if (r.ok) location.reload();
+  else { const j = await r.json(); alert(j.detail || "No se pudo cancelar"); }
+}));
+</script>
+{% endblock %}

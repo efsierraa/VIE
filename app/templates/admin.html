@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Administración — VIE{% endblock %}
+{% block content %}
+<h1>Administración</h1>
+<section class="card">
+  <h2>Nueva cuenta</h2>
+  <form id="user-form" class="form">
+    <div class="row">
+      <label>Usuario <input name="username" required></label>
+      <label>Clave <input name="password" type="password" required minlength="6"></label>
+    </div>
+    <label>Nombre completo <input name="full_name" required></label>
+    <label>Rol
+      <select name="role" id="role-select">
+        <option value="residente">Residente</option>
+        <option value="celador">Celador</option>
+        <option value="admin">Administración</option>
+      </select>
+    </label>
+    <div class="row" id="apt-fields">
+      <label>Torre <input name="tower" placeholder="Ej: 1"></label>
+      <label>Apartamento <input name="apartment" placeholder="Ej: 502"></label>
+    </div>
+    <button type="submit">Crear cuenta</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Cuentas</h2>
+  <table>
+    <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Torre · Apto</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.username }}</td>
+      <td>{{ u.full_name }}</td>
+      <td><span class="chip role-{{ u.role }}">{{ u.role }}</span></td>
+      <td>{% if u.tower %}T{{ u.tower }} · {{ u.apartment }}{% else %}—{% endif %}</td>
+      <td>{% if u.active %}<span class="chip status-dentro">activa</span>{% else %}<span class="chip status-cancelada">inactiva</span>{% endif %}</td>
+      <td>{% if u.id != user.id %}<button class="small" data-toggle="{{ u.id }}">{{ "Desactivar" if u.active else "Activar" }}</button>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<h1>Historial de ingresos</h1>
+<section class="card">
+  <form method="get" action="/admin" class="form inline filters">
+    <label>Fecha de entrada <input type="date" name="date" value="{{ f_date }}"></label>
+    <label>Torre <input name="tower" value="{{ f_tower }}" size="3"></label>
+    <label>Estado
+      <select name="status">
+        <option value="">Todos</option>
+        {% for s in ["pendiente", "dentro", "finalizada", "cancelada"] %}
+        <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Filtrar</button>
+    <a class="button" href="/admin">Limpiar</a>
+  </form>
+
+  {% if visits %}
+  <table>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Destino</th><th>Autorizó</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
+    <tbody>
+    {% for v in visits %}
+    <tr>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}</td>
+      <td>{{ v.subject }}</td>
+      <td>T{{ v.tower }} · {{ v.apartment }}</td>
+      <td>{{ names.get(v.resident_id, "—") }}</td>
+      <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
+      <td>{{ v.entry_at|dt }}</td>
+      <td>{{ v.exit_at|dt }}</td>
+      <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
+      <td>{{ names.get(v.entry_guard_id, "—") }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin resultados.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.getElementById("user-form");
+const roleSelect = document.getElementById("role-select");
+const aptFields = document.getElementById("apt-fields");
+
+function toggleApt() {
+  aptFields.style.display = roleSelect.value === "residente" ? "" : "none";
+}
+roleSelect.addEventListener("change", toggleApt);
+toggleApt();
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form).entries());
+  const r = await fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+  const j = await r.json();
+  if (r.ok && j.ok) location.reload();
+  else alert(j.detail || "Error creando la cuenta");
+});
+
+document.querySelectorAll("[data-toggle]").forEach(btn => btn.addEventListener("click", async () => {
+  const r = await fetch("/api/users/" + btn.dataset.toggle + "/toggle", {method: "POST"});
+  if (r.ok) location.reload();
+  else { const j = await r.json(); alert(j.detail || "Error"); }
+}));
+</script>
+{% endblock %}

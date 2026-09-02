@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Portería — VIE{% endblock %}
+{% block content %}
+<h1>Portería</h1>
+<section class="card">
+  <div class="row mode-row">
+    <button id="mode-entrada" class="mode active" type="button">Entrada</button>
+    <button id="mode-salida" class="mode" type="button">Salida</button>
+  </div>
+  <div id="reader" class="reader"></div>
+  <div class="row">
+    <button id="btn-cam" type="button">Iniciar cámara</button>
+  </div>
+  <p class="hint">O pega el código del pase si la cámara no está disponible:</p>
+  <form id="token-form" class="form inline">
+    <input id="token-input" placeholder="Código del pase" required>
+    <button type="submit">Validar</button>
+  </form>
+</section>
+
+<section id="result" class="card hidden">
+  <div id="result-body"></div>
+</section>
+
+<details class="card">
+  <summary>Entrada manual (visitante sin QR)</summary>
+  <form id="manual-form" class="form">
+    <label>Nombre <input name="visitor_name" required></label>
+    <label>Asunto <input name="subject" required></label>
+    <label>Identificación (opcional) <input name="id_number"></label>
+    <label>Rol
+      <select name="visitor_role">
+        <option value="visitante">Visitante</option>
+        <option value="domiciliario">Domiciliario</option>
+      </select>
+    </label>
+    <div class="row">
+      <label>Torre <input name="tower" required></label>
+      <label>Apartamento <input name="apartment" required></label>
+    </div>
+    <button type="submit">Registrar entrada manual</button>
+  </form>
+</details>
+
+<h1>Ingresos de hoy</h1>
+<section class="card">
+  {% if visits %}
+  <table>
+    <thead><tr><th>Visitante</th><th>Destino</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
+    <tbody>
+    {% for v in visits %}
+    <tr>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}</td>
+      <td>T{{ v.tower }} · {{ v.apartment }}</td>
+      <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
+      <td>{{ v.entry_at|dt }}</td>
+      <td>{{ v.exit_at|dt }}</td>
+      <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
+      <td>{{ names.get(v.entry_guard_id, "—") }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin ingresos registrados hoy.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let mode = "entrada";
+let scanner = null;
+const resultCard = document.getElementById("result");
+const resultBody = document.getElementById("result-body");
+
+function setMode(m) {
+  mode = m;
+  document.getElementById("mode-entrada").classList.toggle("active", m === "entrada");
+  document.getElementById("mode-salida").classList.toggle("active", m === "salida");
+}
+document.getElementById("mode-entrada").onclick = () => setMode("entrada");
+document.getElementById("mode-salida").onclick = () => setMode("salida");
+
+function show(html) {
+  resultBody.innerHTML = html;
+  resultCard.classList.remove("hidden");
+}
+
+async function submitToken(token) {
+  const r = await fetch("/api/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token: token.trim(), action: mode})});
+  const j = await r.json();
+  if (r.ok && j.ok) {
+    const v = j.visit;
+    show('<p class="alert ok">' + esc(j.message) + '</p>' +
+      '<p><strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')<br>' +
+      esc(v.subject) + '<br>Torre ' + esc(v.tower) + ' · Apto ' + esc(v.apartment) +
+      (v.id_number ? '<br>ID: ' + esc(v.id_number) : '') + '</p>');
+    setTimeout(() => location.reload(), 2500);
+  } else {
+    show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
+  }
+}
+
+document.getElementById("token-form").addEventListener("submit", e => {
+  e.preventDefault();
+  submitToken(document.getElementById("token-input").value);
+  document.getElementById("token-input").value = "";
+});
+
+document.getElementById("btn-cam").addEventListener("click", async () => {
+  if (scanner) return;
+  try {
+    scanner = new Html5Qrcode("reader");
+    await scanner.start({facingMode: "environment"}, {fps: 10, qrbox: 250}, text => {
+      scanner.pause(true);
+      submitToken(text);
+      setTimeout(() => scanner.resume(), 2500);
+    });
+    document.getElementById("btn-cam").disabled = true;
+  } catch (err) {
+    show('<p class="alert error">No se pudo iniciar la cámara. Usa el código pegado o la entrada manual.</p>');
+    scanner = null;
+  }
+});
+
+document.getElementById("manual-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const r = await fetch("/api/visits/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+  const j = await r.json();
+  if (r.ok && j.ok) {
+    show('<p class="alert ok">' + esc(j.message) + ': ' + esc(j.visit.visitor_name) + ' → Torre ' + esc(j.visit.tower) + ' · Apto ' + esc(j.visit.apartment) + '</p>');
+    e.target.reset();
+    setTimeout(() => location.reload(), 2500);
+  } else {
+    show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
+  }
+});
+</script>
+{% endblock %}
