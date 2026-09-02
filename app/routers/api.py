@@ -1,5 +1,6 @@
 import base64
 import io
+import secrets
 from datetime import timedelta
 from uuid import uuid4
 
@@ -16,6 +17,17 @@ from app.utils import format_duration, utcnow
 
 router = APIRouter(prefix="/api")
 
+# Sin letras ambiguas (I, L, O se confunden con 1, 0)
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_short_code(db: Session) -> str:
+    """Código corto de 6 caracteres, único, para digitar en portería."""
+    while True:
+        code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
+        if not db.query(Visit).filter(Visit.short_code == code).first():
+            return code
+
 
 def qr_data_uri(text: str) -> str:
     img = qrcode.make(text, box_size=6, border=2)
@@ -28,6 +40,7 @@ def visit_dict(v: Visit) -> dict:
     return {
         "id": v.id,
         "uuid": v.uuid,
+        "short_code": v.short_code,
         "visitor_name": v.visitor_name,
         "subject": v.subject,
         "id_number": v.id_number,
@@ -52,7 +65,8 @@ class VisitIn(BaseModel):
 
 
 class ScanIn(BaseModel):
-    token: str
+    token: str | None = None  # contenido del QR (código largo firmado)
+    code: str | None = None  # código corto digitado por el guarda
     action: str  # entrada | salida
 
 
@@ -96,6 +110,7 @@ def create_visit(
 
     visit = Visit(
         uuid=str(uuid4()),
+        short_code=new_short_code(db),
         visitor_name=visitor_name,
         subject=subject,
         id_number=(data.id_number or "").strip() or None,
@@ -152,12 +167,20 @@ def scan(
 ):
     if data.action not in ("entrada", "salida"):
         raise HTTPException(400, "Acción no válida")
-    visit_uuid = verify_token(data.token)
-    if visit_uuid is None:
-        raise HTTPException(400, "QR inválido o alterado")
-    visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
-    if visit is None:
-        raise HTTPException(400, "QR inválido o alterado")
+
+    if data.code:
+        visit = db.query(Visit).filter(Visit.short_code == data.code.strip().upper()).first()
+        if visit is None:
+            raise HTTPException(400, "Código corto no válido")
+    else:
+        if not data.token:
+            raise HTTPException(400, "Falta el código o el QR")
+        visit_uuid = verify_token(data.token)
+        if visit_uuid is None:
+            raise HTTPException(400, "QR inválido o alterado")
+        visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+        if visit is None:
+            raise HTTPException(400, "QR inválido o alterado")
 
     now = utcnow()
     if visit.status == "pendiente":
@@ -203,6 +226,7 @@ def manual_entry(
 
     visit = Visit(
         uuid=str(uuid4()),
+        short_code=new_short_code(db),
         visitor_name=visitor_name,
         subject=subject,
         id_number=(data.id_number or "").strip() or None,

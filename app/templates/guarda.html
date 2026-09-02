@@ -11,9 +11,9 @@
   <div class="row">
     <button id="btn-cam" type="button">Iniciar cámara</button>
   </div>
-  <p class="hint">O pega el código del pase si la cámara no está disponible:</p>
+  <p class="hint">Si la cámara no está disponible, digita el código corto del pase o pega el código largo:</p>
   <form id="token-form" class="form inline">
-    <input id="token-input" placeholder="Código del pase" required>
+    <input id="token-input" placeholder="Ej: K7M2PA o pega el pase completo" required autocomplete="off">
     <button type="submit">Validar</button>
   </form>
 </section>
@@ -89,8 +89,8 @@ function show(html) {
   resultCard.classList.remove("hidden");
 }
 
-async function submitToken(token) {
-  const r = await fetch("/api/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token: token.trim(), action: mode})});
+async function submitScan(payload) {
+  const r = await fetch("/api/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({...payload, action: mode})});
   const j = await r.json();
   if (r.ok && j.ok) {
     const v = j.visit;
@@ -106,7 +106,11 @@ async function submitToken(token) {
 
 document.getElementById("token-form").addEventListener("submit", e => {
   e.preventDefault();
-  submitToken(document.getElementById("token-input").value);
+  const raw = document.getElementById("token-input").value.trim();
+  // corto (≤8 caracteres, sin puntos) se manda como código; el resto, como pase firmado
+  const esCorto = raw.length <= 8 && !raw.includes(".");
+  const payload = esCorto ? {code: raw.toUpperCase()} : {token: raw};
+  submitScan(payload);
   document.getElementById("token-input").value = "";
 });
 
@@ -116,7 +120,7 @@ document.getElementById("btn-cam").addEventListener("click", async () => {
     scanner = new Html5Qrcode("reader");
     await scanner.start({facingMode: "environment"}, {fps: 10, qrbox: 250}, text => {
       scanner.pause(true);
-      submitToken(text);
+      submitScan({token: text.trim()});
       setTimeout(() => scanner.resume(), 2500);
     });
     document.getElementById("btn-cam").disabled = true;

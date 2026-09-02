@@ -158,6 +158,16 @@ td small { color: var(--gris-texto); }
   padding: 0.5rem;
   font-size: 0.75rem;
 }
+.short-code { margin: 0.4rem 0; }
+.short-code strong {
+  display: inline-block;
+  font-size: 1.5rem;
+  letter-spacing: 0.25em;
+  color: var(--verde-oscuro);
+  background: var(--verde-suave);
+  padding: 0.15rem 0.7rem;
+  border-radius: 8px;
+}
 .mode-row .mode { flex: 1; background: #eceff1; color: #37474f; }
 .mode-row .mode.active { background: var(--verde); color: #fff; }
 

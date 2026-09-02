@@ -27,6 +27,7 @@ class Visit(Base):
 
     id = Column(Integer, primary_key=True)
     uuid = Column(String(36), unique=True, nullable=False, index=True)
+    short_code = Column(String(8), unique=True, index=True)  # código corto para digitar en portería
     visitor_name = Column(String(120), nullable=False)
     subject = Column(String(200), nullable=False)
     id_number = Column(String(30))

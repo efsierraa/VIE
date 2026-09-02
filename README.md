@@ -7,8 +7,8 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 ## Cómo funciona
 
-1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** — imagen y código de texto — para compartir por cualquier app.
-2. **Guarda**: escanea el QR en portería (o digita el código) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
+1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** para compartir por WhatsApp — imagen y texto — junto con un **código corto de 6 caracteres**.
+2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
 3. **Administración**: crea las cuentas y supervisa el **historial completo** de ingresos con filtros.
 
 Si la app falla, el guarda registra a mano (entrada manual) o se vuelve al método de siempre: llamar y anotar.

@@ -30,11 +30,15 @@
   <h2>Pase listo para enviar</h2>
   <div class="qr-box"><img id="qr-img" alt="QR de ingreso"></div>
   <p class="hint">El QR es de un solo uso. El guarda lo escanea a la entrada y, si quiere, marca la salida.</p>
-  <p><code id="token" class="token"></code></p>
+  <p class="short-code">Código para portería: <strong id="short-code"></strong></p>
+  <details>
+    <summary>Código largo (por si la imagen no carga)</summary>
+    <code id="token" class="token"></code>
+  </details>
   <div class="row">
-    <button id="btn-copy" type="button">Copiar código</button>
-    <button id="btn-share" type="button">Compartir</button>
-    <a id="btn-wa" class="button" target="_blank" rel="noopener">WhatsApp</a>
+    <button id="btn-share" type="button">Compartir por WhatsApp</button>
+    <a id="btn-download" class="button" download="pase-vie.png">Descargar QR</a>
+    <button id="btn-copy" type="button">Copiar código corto</button>
   </div>
 </section>
 
@@ -42,12 +46,13 @@
 <section class="card">
   {% if visits %}
   <table>
-    <thead><tr><th>Visitante</th><th>Asunto</th><th>Estado</th><th>Creada</th><th>Vence</th><th></th></tr></thead>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Código</th><th>Estado</th><th>Creada</th><th>Vence</th><th></th></tr></thead>
     <tbody>
     {% for v in visits %}
       <tr>
         <td>{{ v.visitor_name }}<br><small>{{ v.visitor_role }}</small></td>
         <td>{{ v.subject }}</td>
+        <td><strong>{{ v.short_code or "—" }}</strong></td>
         <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
         <td>{{ v.created_at|dt }}</td>
         <td>{{ v.expires_at|dt }}</td>
@@ -68,6 +73,15 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const form = document.getElementById("visit-form");
 const result = document.getElementById("result");
 
+function dataUriToFile(dataUri, filename) {
+  const [meta, b64] = dataUri.split(",");
+  const mime = meta.match(/data:(.*?);/)[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], filename, {type: mime});
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form).entries());
@@ -77,24 +91,42 @@ form.addEventListener("submit", async (e) => {
   if (!r.ok) { alert(j.detail || "Error creando la visita"); return; }
   document.getElementById("qr-img").src = j.qr_data_uri;
   document.getElementById("token").textContent = j.token;
+  document.getElementById("short-code").textContent = j.visit.short_code;
+  document.getElementById("btn-download").href = j.qr_data_uri;
   const v = j.visit;
   const text = "Pase de ingreso VIE\n" +
     "Visitante: " + v.visitor_name + "\n" +
     "Asunto: " + v.subject + "\n" +
     "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
-    "Un solo uso. Muestra este código en portería:\n" + j.token;
-  document.getElementById("btn-share").onclick = () => {
-    if (navigator.share) navigator.share({title: "Pase VIE", text}).catch(() => {});
-    else { navigator.clipboard.writeText(text); alert("Código copiado; pégalo en cualquier app."); }
+    "Código para portería: " + v.short_code + "\n" +
+    "Un solo uso.";
+  document.getElementById("btn-share").onclick = async () => {
+    let compartido = false;
+    try {
+      const file = dataUriToFile(j.qr_data_uri, "pase-vie-" + v.short_code + ".png");
+      if (navigator.canShare && navigator.canShare({files: [file]})) {
+        await navigator.share({files: [file], title: "Pase VIE", text});
+        compartido = true;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+    if (compartido) return;
+    try {
+      await navigator.share({title: "Pase VIE", text});
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      navigator.clipboard.writeText(text);
+      alert("Tu navegador no permite compartir la imagen desde aquí. Descarga el QR, adjúntalo en WhatsApp y pega el texto (ya quedó copiado).");
+    }
   };
-  document.getElementById("btn-wa").href = "https://wa.me/?text=" + encodeURIComponent(text);
   result.classList.remove("hidden");
   result.scrollIntoView({behavior: "smooth"});
   form.reset();
 });
 
 document.getElementById("btn-copy").onclick = () => {
-  navigator.clipboard.writeText(document.getElementById("token").textContent);
+  navigator.clipboard.writeText(document.getElementById("short-code").textContent);
 };
 
 document.querySelectorAll("[data-cancel]").forEach(btn => btn.addEventListener("click", async () => {
