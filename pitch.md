@@ -1,7 +1,7 @@
 # VIE — Vigilancia de Ingresos y Egresos
 
 > **El control de acceso de tu edificio, en un escaneo.**  
-> Una app gratuita, libre y hecha con el corazón: mi tío es celador y sé lo que es anotar de noche, bajo la lluvia, en una libreta que se acaba de mojar.
+> Una app gratuita, libre y hecha con el corazón: mi tío es guarda y sé lo que es anotar de noche, bajo la lluvia, en una libreta que se acaba de mojar.
 
 ---
 
@@ -9,12 +9,12 @@
 
 En la mayoría de edificios residenciales, el control de acceso sigue siendo 100% manual:
 
-- El celador anota cada visitante en una **libreta física**: lenta, ilegible, fácil de perder.
+- El guarda anota cada visitante en una **libreta física**: lenta, ilegible, fácil de perder.
 - Cada ingreso implica **llamar al apartamento** y esperar que alguien conteste.
 - **Cero trazabilidad**: ¿quién autorizó ese ingreso? ¿cuánto duró la visita? Nadie lo sabe con certeza.
-- La información queda en papel que **nadie audita**, y la seguridad del edificio depende de la memoria y la letra del celador de turno.
+- La información queda en papel que **nadie audita**, y la seguridad del edificio depende de la memoria y la letra del guarda de turno.
 
-El resultado: riesgo de seguridad real, trabajo pesado e injusto para el celador, y nula visibilidad para administración y consejo.
+El resultado: riesgo de seguridad real, trabajo pesado e injusto para el guarda, y nula visibilidad para administración y consejo.
 
 ## 2. La solución
 
@@ -22,8 +22,8 @@ El resultado: riesgo de seguridad real, trabajo pesado e injusto para el celador
 
 1. El **residente** genera un QR desde la app con los datos básicos de su visita.
 2. Se lo comparte al visitante por **cualquier plataforma** — WhatsApp, Telegram, SMS, correo — como **imagen** o como **código de texto**.
-3. El **celador escanea** el QR en portería: en segundos verifica si está autorizado y registra el ingreso.
-4. Cuando el visitante sale, el celador hace un **segundo escaneo opcional que marca la salida** — así el edificio sabe exactamente cuánto duró cada visita.
+3. El **guarda escanea** el QR en portería: en segundos verifica si está autorizado y registra el ingreso.
+4. Cuando el visitante sale, el guarda hace un **segundo escaneo opcional que marca la salida** — así el edificio sabe exactamente cuánto duró cada visita.
 
 El visitante **no instala nada**. Recibe el pase — imagen o código de texto — por el canal que prefiera y lo muestra en portería.
 
@@ -34,10 +34,10 @@ El visitante **no instala nada**. Recibe el pase — imagen o código de texto �
 - El QR incluye datos básicos configurables: **nombre del visitante, asunto, identificación (opcional) y rol** (visitante, domiciliario, etc.).
 - Comparte el pase por cualquier app de mensajería, como **imagen** o como **código de texto**. Sin llamadas, sin bajadas a portería, sin fotos de cédulas.
 
-### Celador
+### Guarda
 - **Escaneo de entrada**: la app le muestra de un vistazo si el visitante está autorizado, a qué torre y apartamento va, y con qué asunto.
 - **Escaneo de salida (opcional, recomendado)**: marca la salida del visitante para tener control de la duración de la estancia.
-- **Código de texto como respaldo**: si el visitante no puede mostrar la imagen, el celador digita el código alfanumérico equivalente.
+- **Código de texto como respaldo**: si el visitante no puede mostrar la imagen, el guarda digita el código alfanumérico equivalente.
 - El QR **es de un solo uso**: no se puede reutilizar ni reenviar para colarse.
 
 ### Visitante / domiciliario
@@ -53,15 +53,15 @@ El visitante **no instala nada**. Recibe el pase — imagen o código de texto �
 | | |
 |---|---|
 | **Objetivo** | Digitalizar y fortalecer el control de ingresos y egresos en edificios residenciales, con tecnología accesible para porterías de cualquier presupuesto. |
-| **Propósito** | Un proyecto **social y open source** con dos motores: mejorar el portafolio profesional de quien lo desarrolla y, sobre todo, **hacerle la vida más fácil a los celadores** — los primeros en servir y los últimos en ser escuchados. Esta app nació por mi tío, que es celador. Es una app hecha con el corazón. |
-| **Impacto** | - **Seguridad**: trazabilidad total de quién entra, quién autorizó y cuánto duró la visita.<br>- **Dignidad laboral**: menos carga manual para el celador, menos error humano.<br>- **Comunidad**: residentes con control real sobre quién accede a su hogar.<br>- **Software libre**: cualquier edificio puede usarlo, adaptarlo y mejorarlo. Sin licencias, sin suscripciones, sin letra pequeña — y con una comunidad que corrige bugs y añade mejoras a velocidad que ningún proveedor cerrado puede igualar. |
+| **Propósito** | Un proyecto **social y open source** con dos motores: mejorar el portafolio profesional de quien lo desarrolla y, sobre todo, **hacerle la vida más fácil a los guardaes** — los primeros en servir y los últimos en ser escuchados. Esta app nació por mi tío, que es guarda. Es una app hecha con el corazón. |
+| **Impacto** | - **Seguridad**: trazabilidad total de quién entra, quién autorizó y cuánto duró la visita.<br>- **Dignidad laboral**: menos carga manual para el guarda, menos error humano.<br>- **Comunidad**: residentes con control real sobre quién accede a su hogar.<br>- **Software libre**: cualquier edificio puede usarlo, adaptarlo y mejorarlo. Sin licencias, sin suscripciones, sin letra pequeña — y con una comunidad que corrige bugs y añade mejoras a velocidad que ningún proveedor cerrado puede igualar. |
 
 ## 5. Características del MVP
 
 - Generación de **QR de un solo uso** desde la app del residente.
 - Datos de visita: nombre, asunto, identificación opcional, rol (visitante, domiciliario).
-- **Compartir sin ataduras**: el pase se envía por cualquier plataforma como **imagen (QR)** o **código de texto** digitable por el celador.
-- Escaneo del celador: **validación de autorización** en segundos.
+- **Compartir sin ataduras**: el pase se envía por cualquier plataforma como **imagen (QR)** o **código de texto** digitable por el guarda.
+- Escaneo del guarda: **validación de autorización** en segundos.
 - **Registro de entrada y salida** (salida opcional) con cálculo de duración de visita.
 - Historial de ingresos: visitante, autorizante, torre, apartamento, fecha y hora.
 - Roles diferenciados: **solo residentes y personal de seguridad usan la app**; los visitantes solo reciben el QR.
@@ -71,7 +71,7 @@ El visitante **no instala nada**. Recibe el pase — imagen o código de texto �
 VIE no llega a imponerse: llega a **acompañar**.
 
 - **Acuerdo con la administración**: la app se implementa solo con el visto bueno de administración y consejo, que además supervisan la base de datos de ingresos.
-- **Periodo de acostumbración**: durante la transición, el celador puede **digitar manualmente** todos los datos de quien ingresa si el visitante no trae QR o el residente no usa la app. Nadie queda por fuera.
+- **Periodo de acostumbración**: durante la transición, el guarda puede **digitar manualmente** todos los datos de quien ingresa si el visitante no trae QR o el residente no usa la app. Nadie queda por fuera.
 - **Plan B garantizado**: si la app falla, se vuelve —sin drama— al método de siempre: llamar al apartamento y anotar. Cero costo, cero dependencia de un proveedor.
 - **Mejora continua por la comunidad**: al ser gratuita y open source, VIE puede ser **rápidamente mejorada y sus bugs reparados por la comunidad**. Cualquier desarrollador puede reportar problemas, proponer soluciones y contribuir código — la app evoluciona al ritmo de quienes la usan, no al ritmo de un proveedor.
 
