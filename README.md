@@ -9,7 +9,7 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** para compartir por WhatsApp — imagen y texto — junto con un **código corto de 6 caracteres**.
 2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
-3. **Administración**: crea las cuentas y supervisa el **historial completo** de ingresos con filtros.
+3. **Administración**: dashboard con métricas del día, crea las cuentas (una a una o **importando un CSV**), asigna claves y **exporta el historial a Excel** por rango de fechas.
 
 Si la app falla, el guarda registra a mano (entrada manual) o se vuelve al método de siempre: llamar y anotar.
 
@@ -27,7 +27,7 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 
 # crear el primer administrador
-.venv\Scripts\python seed_admin.py --usuario admin --clave una-clave-segura --nombre "Administración"
+.venv\Scripts\python seed_admin.py --usuario admin --clave una-clave-segura --nombres "María" --apellidos "Pérez"
 
 # levantar el servidor
 .venv\Scripts\python -m uvicorn app.main:app --reload
@@ -69,8 +69,20 @@ Desde tu PC, apuntando a la base de producción:
 
 ```powershell
 $env:VIE_DATABASE_URL = "postgresql://...neon.tech/neondb?sslmode=require"
-.venv\Scripts\python seed_admin.py --usuario admin --clave una-clave-segura --nombre "Administración"
+.venv\Scripts\python seed_admin.py --usuario admin --clave una-clave-segura --nombres "María" --apellidos "Pérez"
 ```
+
+### Importar usuarios por CSV
+
+Administración → "Importar usuarios desde CSV". Primera fila del archivo:
+
+```
+nombres,apellidos,usuario,clave,rol,torre,apartamento
+Camila,Rojas,camilar,clave123,residente,3,301
+Pedro,Gómez,pgomez,clave123,guarda,,
+```
+
+Roles válidos: `residente`, `guarda`, `admin`. Un residente requiere torre y apartamento. Las filas con errores se reportan sin detener la importación.
 
 Listo: entra a `https://vie-XXXX.onrender.com` con esa cuenta y crea los residentes y guardas desde la pantalla de administración.
 

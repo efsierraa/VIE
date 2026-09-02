@@ -1,7 +1,7 @@
 """Crea la primera cuenta de administración.
 
 Ejemplo:
-    python seed_admin.py --usuario admin --clave una-clave-segura --nombre "Administración"
+    python seed_admin.py --usuario admin --clave una-clave-segura --nombres "María" --apellidos "Pérez"
 """
 import argparse
 
@@ -14,7 +14,8 @@ def main():
     parser = argparse.ArgumentParser(description="Crear la primera cuenta de administración de VIE")
     parser.add_argument("--usuario", required=True)
     parser.add_argument("--clave", required=True)
-    parser.add_argument("--nombre", required=True)
+    parser.add_argument("--nombres", required=True)
+    parser.add_argument("--apellidos", required=True)
     args = parser.parse_args()
 
     Base.metadata.create_all(engine)
@@ -28,7 +29,8 @@ def main():
             User(
                 username=args.usuario.lower(),
                 password_hash=hash_password(args.clave),
-                full_name=args.nombre,
+                nombres=args.nombres,
+                apellidos=args.apellidos,
                 role="admin",
             )
         )

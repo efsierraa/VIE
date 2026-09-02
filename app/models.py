@@ -15,11 +15,17 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(120), nullable=False)
+    nombres = Column(String(120), nullable=False, default="")
+    apellidos = Column(String(120), nullable=False, default="")
     role = Column(String(20), nullable=False)  # admin | guarda | residente
     tower = Column(String(10))
     apartment = Column(String(10))
     active = Column(Boolean, default=True, nullable=False)
+    full_name = Column(String(120))  # legado: solo se usa para migrar datos viejos
+
+    @property
+    def nombre_completo(self) -> str:
+        return f"{self.nombres} {self.apellidos}".strip()
 
 
 class Visit(Base):

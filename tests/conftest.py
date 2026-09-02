@@ -22,10 +22,10 @@ def database():
     db = SessionLocal()
     db.add_all(
         [
-            User(username="admin1", password_hash=hash_password("clave123"), full_name="Administración", role="admin"),
-            User(username="guarda1", password_hash=hash_password("clave123"), full_name="Guarda de Turno", role="guarda"),
-            User(username="residente1", password_hash=hash_password("clave123"), full_name="Residenta Uno", role="residente", tower="1", apartment="101"),
-            User(username="residente2", password_hash=hash_password("clave123"), full_name="Residente Dos", role="residente", tower="2", apartment="202"),
+            User(username="admin1", password_hash=hash_password("clave123"), nombres="Administración", apellidos="General", role="admin"),
+            User(username="guarda1", password_hash=hash_password("clave123"), nombres="Guarda", apellidos="de Turno", role="guarda"),
+            User(username="residente1", password_hash=hash_password("clave123"), nombres="Residenta", apellidos="Uno", role="residente", tower="1", apartment="101"),
+            User(username="residente2", password_hash=hash_password("clave123"), nombres="Residente", apellidos="Dos", role="residente", tower="2", apartment="202"),
         ]
     )
     db.commit()

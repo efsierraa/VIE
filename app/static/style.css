@@ -168,6 +168,47 @@ td small { color: var(--gris-texto); }
   padding: 0.15rem 0.7rem;
   border-radius: 8px;
 }
+
+/* Ver/Ocultar clave */
+.pw-wrap { display: flex; gap: 0.4rem; }
+.pw-wrap input { flex: 1; width: auto; }
+.pw-toggle {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  background: #eceff1;
+  color: #37474f;
+  white-space: nowrap;
+}
+.pw-toggle:hover { background: #cfd8dc; }
+
+/* Tablas anchas: scroll horizontal dentro de la tarjeta, sin romper el layout */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 560px; }
+
+/* Tarjetas de estadísticas del dashboard */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.stat {
+  background: #fff;
+  border: 1px solid var(--gris-borde);
+  border-radius: var(--radio);
+  padding: 0.7rem;
+  text-align: center;
+}
+.stat strong { display: block; font-size: 1.6rem; color: var(--verde-oscuro); }
+.stat span {
+  font-size: 0.75rem;
+  color: var(--gris-texto);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+@media (min-width: 560px) {
+  .stats { grid-template-columns: repeat(4, 1fr); }
+}
 .mode-row .mode { flex: 1; background: #eceff1; color: #37474f; }
 .mode-row .mode.active { background: var(--verde); color: #fff; }
 

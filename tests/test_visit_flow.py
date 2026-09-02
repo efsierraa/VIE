@@ -107,7 +107,7 @@ def test_residente_requiere_torre_y_apto(client):
     login(client, "admin1")
     r = client.post(
         "/api/users",
-        json={"username": "sinapto", "password": "clave123", "full_name": "Sin Apto", "role": "residente"},
+        json={"username": "sinapto", "password": "clave123", "nombres": "Sin", "apellidos": "Apto", "role": "residente"},
     )
     assert r.status_code == 400
     assert "torre" in r.json()["detail"].lower()

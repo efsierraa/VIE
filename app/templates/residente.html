@@ -44,6 +44,7 @@
 
 <h1>Mis visitas</h1>
 <section class="card">
+  <div class="table-wrap">
   {% if visits %}
   <table>
     <thead><tr><th>Visitante</th><th>Asunto</th><th>Código</th><th>Estado</th><th>Creada</th><th>Vence</th><th></th></tr></thead>
@@ -56,7 +57,12 @@
         <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
         <td>{{ v.created_at|dt }}</td>
         <td>{{ v.expires_at|dt }}</td>
-        <td>{% if v.status == "pendiente" %}<button class="small danger" data-cancel="{{ v.uuid }}">Cancelar</button>{% endif %}</td>
+        <td>
+          {% if v.status == "pendiente" %}
+          <button class="small" data-verqr="{{ v.uuid }}">Ver QR</button>
+          <button class="small danger" data-cancel="{{ v.uuid }}">Cancelar</button>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
     </tbody>
@@ -64,6 +70,7 @@
   {% else %}
   <p class="hint">Aún no has creado visitas.</p>
   {% endif %}
+  </div>
 </section>
 {% endblock %}
 
@@ -82,18 +89,13 @@ function dataUriToFile(dataUri, filename) {
   return new File([bytes], filename, {type: mime});
 }
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(form).entries());
-  data.hours = parseInt(data.hours, 10);
-  const r = await fetch("/api/visits", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
-  const j = await r.json();
-  if (!r.ok) { alert(j.detail || "Error creando la visita"); return; }
+function mostrarPase(j) {
   document.getElementById("qr-img").src = j.qr_data_uri;
   document.getElementById("token").textContent = j.token;
   document.getElementById("short-code").textContent = j.visit.short_code;
-  document.getElementById("btn-download").href = j.qr_data_uri;
-  document.getElementById("btn-download").download = "pase-vie-" + j.visit.short_code + ".png";
+  const dl = document.getElementById("btn-download");
+  dl.href = j.qr_data_uri;
+  dl.download = "pase-vie-" + j.visit.short_code + ".png";
   const v = j.visit;
   const text = "Pase de ingreso VIE\n" +
     "Visitante: " + v.visitor_name + "\n" +
@@ -123,8 +125,25 @@ form.addEventListener("submit", async (e) => {
   };
   result.classList.remove("hidden");
   result.scrollIntoView({behavior: "smooth"});
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form).entries());
+  data.hours = parseInt(data.hours, 10);
+  const r = await fetch("/api/visits", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
+  const j = await r.json();
+  if (!r.ok) { alert(j.detail || "Error creando la visita"); return; }
+  mostrarPase(j);
   form.reset();
 });
+
+document.querySelectorAll("[data-verqr]").forEach(btn => btn.addEventListener("click", async () => {
+  const r = await fetch("/api/visits/" + btn.dataset.verqr + "/pass");
+  const j = await r.json();
+  if (r.ok && j.ok) mostrarPase(j);
+  else alert(j.detail || "No se pudo abrir el pase");
+}));
 
 document.getElementById("btn-copy").onclick = () => {
   navigator.clipboard.writeText(document.getElementById("short-code").textContent);

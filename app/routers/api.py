@@ -1,15 +1,16 @@
 import base64
+import csv
 import io
 import secrets
 from datetime import timedelta
 from uuid import uuid4
 
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import hash_password, require_api
+from app.auth import hash_password, require_api, verify_password
 from app.database import get_db
 from app.models import ROLES, VALID_HOURS, VISITOR_ROLES, User, Visit
 from app.security import sign_visit, verify_token
@@ -80,12 +81,66 @@ class ManualIn(BaseModel):
 
 
 class UserIn(BaseModel):
+    nombres: str
+    apellidos: str
     username: str
     password: str
-    full_name: str
     role: str
     tower: str | None = None
     apartment: str | None = None
+
+
+class PasswordAssign(BaseModel):
+    nueva: str
+
+
+class PasswordChange(BaseModel):
+    actual: str
+    nueva: str
+
+
+def _crear_usuario(
+    db: Session,
+    *,
+    nombres: str,
+    apellidos: str,
+    username: str,
+    password: str,
+    role: str,
+    tower: str | None = None,
+    apartment: str | None = None,
+) -> User:
+    """Crea un usuario validando todo; levanta ValueError con el mensaje para el humano."""
+    username = username.strip().lower()
+    nombres = nombres.strip()
+    apellidos = apellidos.strip()
+    tower = (tower or "").strip().upper() or None
+    apartment = (apartment or "").strip() or None
+    if len(username) < 3:
+        raise ValueError("El usuario debe tener al menos 3 caracteres")
+    if len(password) < 6:
+        raise ValueError("La clave debe tener al menos 6 caracteres")
+    if not nombres or not apellidos:
+        raise ValueError("Nombres y apellidos son obligatorios")
+    if role not in ROLES:
+        raise ValueError("Rol no válido")
+    if role == "residente" and not (tower and apartment):
+        raise ValueError("Un residente requiere torre y apartamento")
+    if db.query(User).filter(User.username == username).first():
+        raise ValueError(f"El usuario '{username}' ya existe")
+    user = User(
+        username=username,
+        password_hash=hash_password(password),
+        nombres=nombres,
+        apellidos=apellidos,
+        role=role,
+        tower=tower,
+        apartment=apartment,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 # --- Residente -------------------------------------------------------------
@@ -154,6 +209,22 @@ def cancel_visit(
     visit.status = "cancelada"
     db.commit()
     return {"ok": True, "visit": visit_dict(visit)}
+
+
+@router.get("/visits/{visit_uuid}/pass")
+def visit_pass(
+    visit_uuid: str,
+    user: User = Depends(require_api("residente")),
+    db: Session = Depends(get_db),
+):
+    """Vuelve a mostrar el pase (QR + código corto) de una visita pendiente."""
+    visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+    if visit is None or visit.resident_id != user.id:
+        raise HTTPException(404, "Visita no encontrada")
+    if visit.status != "pendiente":
+        raise HTTPException(400, "Este pase ya fue usado o cancelado")
+    token = sign_visit(visit.uuid)
+    return {"ok": True, "token": token, "qr_data_uri": qr_data_uri(token), "visit": visit_dict(visit)}
 
 
 # --- Guarda ---------------------------------------------------------------
@@ -255,34 +326,97 @@ def create_user(
     admin: User = Depends(require_api("admin")),
     db: Session = Depends(get_db),
 ):
-    username = data.username.strip().lower()
-    full_name = data.full_name.strip()
-    tower = (data.tower or "").strip().upper() or None
-    apartment = (data.apartment or "").strip() or None
-    if len(username) < 3:
-        raise HTTPException(400, "El usuario debe tener al menos 3 caracteres")
-    if len(data.password) < 6:
-        raise HTTPException(400, "La clave debe tener al menos 6 caracteres")
-    if not full_name:
-        raise HTTPException(400, "El nombre es obligatorio")
-    if data.role not in ROLES:
-        raise HTTPException(400, "Rol no válido")
-    if data.role == "residente" and not (tower and apartment):
-        raise HTTPException(400, "Un residente requiere torre y apartamento")
-    if db.query(User).filter(User.username == username).first():
-        raise HTTPException(400, "Ese usuario ya existe")
+    try:
+        _crear_usuario(
+            db,
+            nombres=data.nombres,
+            apellidos=data.apellidos,
+            username=data.username,
+            password=data.password,
+            role=data.role,
+            tower=data.tower,
+            apartment=data.apartment,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
 
-    user = User(
-        username=username,
-        password_hash=hash_password(data.password),
-        full_name=full_name,
-        role=data.role,
-        tower=tower,
-        apartment=apartment,
-    )
-    db.add(user)
+
+@router.post("/users/csv")
+async def import_users_csv(
+    file: UploadFile = File(...),
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """CSV con encabezado: nombres,apellidos,usuario,clave,rol,torre,apartamento."""
+    raw = await file.read()
+    try:
+        texto = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        texto = raw.decode("cp1252", errors="replace")
+    filas = list(csv.reader(io.StringIO(texto)))
+    if not filas:
+        raise HTTPException(400, "El CSV está vacío")
+    esperado = ["nombres", "apellidos", "usuario", "clave", "rol", "torre", "apartamento"]
+    encabezado = [c.strip().lower() for c in filas[0]]
+    if encabezado != esperado:
+        raise HTTPException(400, "El CSV debe iniciar con la fila: " + ",".join(esperado))
+
+    creados, errores = 0, []
+    for num, fila in enumerate(filas[1:], start=2):
+        if not any(c.strip() for c in fila):
+            continue
+        if len(fila) < 7:
+            errores.append(f"línea {num}: faltan columnas")
+            continue
+        nombres, apellidos, username, clave, rol, torre, apto = (c.strip() for c in fila[:7])
+        try:
+            _crear_usuario(
+                db,
+                nombres=nombres,
+                apellidos=apellidos,
+                username=username,
+                password=clave,
+                role=rol,
+                tower=torre,
+                apartment=apto,
+            )
+            creados += 1
+        except ValueError as e:
+            errores.append(f"línea {num}: {e}")
+    return {"ok": True, "creados": creados, "errores": errores}
+
+
+@router.post("/users/{user_id}/password")
+def assign_password(
+    user_id: int,
+    data: PasswordAssign,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar)."""
+    if len(data.nueva) < 6:
+        raise HTTPException(400, "La clave debe tener al menos 6 caracteres")
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "Usuario no encontrado")
+    user.password_hash = hash_password(data.nueva)
     db.commit()
-    db.refresh(user)
+    return {"ok": True}
+
+
+@router.post("/me/password")
+def change_my_password(
+    data: PasswordChange,
+    user: User = Depends(require_api()),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(data.actual, user.password_hash):
+        raise HTTPException(400, "La clave actual es incorrecta")
+    if len(data.nueva) < 6:
+        raise HTTPException(400, "La nueva clave debe tener al menos 6 caracteres")
+    user.password_hash = hash_password(data.nueva)
+    db.commit()
     return {"ok": True}
 
 

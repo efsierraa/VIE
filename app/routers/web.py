@@ -1,8 +1,10 @@
-from datetime import datetime, time, timezone
+import io
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+import openpyxl
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -50,7 +52,7 @@ def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
     if not ids:
         return {}
     users = db.query(User).filter(User.id.in_(ids)).all()
-    return {u.id: u.full_name for u in users}
+    return {u.id: u.nombre_completo for u in users}
 
 
 def day_window_utc(day) -> tuple[datetime, datetime]:
@@ -123,6 +125,17 @@ def residente_page(
     )
 
 
+# --- Cuenta (cualquier rol) --------------------------------------------------
+
+
+@router.get("/cuenta", response_class=HTMLResponse)
+def cuenta_page(
+    request: Request,
+    user: User = Depends(require_page()),
+):
+    return templates.TemplateResponse(request, "cuenta.html", {"user": user})
+
+
 # --- Guarda -----------------------------------------------------------------
 
 
@@ -177,6 +190,15 @@ def admin_page(
 
     visits = query.order_by(Visit.id.desc()).limit(100).all()
     users = db.query(User).order_by(User.role, User.username).all()
+
+    today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
+    start_utc, _ = day_window_utc(today_local)
+    stats = {
+        "hoy": db.query(Visit).filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc).count(),
+        "dentro": db.query(Visit).filter(Visit.status == "dentro").count(),
+        "pendientes": db.query(Visit).filter(Visit.status == "pendiente").count(),
+        "activos": db.query(User).filter(User.active.is_(True)).count(),
+    }
     return templates.TemplateResponse(
         request,
         "admin.html",
@@ -185,8 +207,78 @@ def admin_page(
             "visits": visits,
             "users": users,
             "names": name_map(db, visits),
+            "stats": stats,
             "f_date": date or "",
             "f_tower": tower or "",
             "f_status": status or "",
         },
+    )
+
+
+@router.get("/admin/exportar")
+def exportar_visitas(
+    user: User = Depends(require_page("admin")),
+    desde: str = "",
+    hasta: str = "",
+    db: Session = Depends(get_db),
+):
+    hoy = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
+    try:
+        d1 = datetime.strptime(desde, "%Y-%m-%d").date() if desde else hoy - timedelta(days=30)
+    except ValueError:
+        d1 = hoy - timedelta(days=30)
+    try:
+        d2 = datetime.strptime(hasta, "%Y-%m-%d").date() if hasta else hoy
+    except ValueError:
+        d2 = hoy
+    if d1 > d2:
+        d1, d2 = d2, d1
+    start_utc, _ = day_window_utc(d1)
+    _, end_utc = day_window_utc(d2)
+    visits = (
+        db.query(Visit)
+        .filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
+        .order_by(Visit.entry_at)
+        .all()
+    )
+    names = name_map(db, visits)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ingresos"
+    ws.append(
+        [
+            "Fecha entrada", "Hora entrada", "Visitante", "Identificación", "Rol",
+            "Asunto", "Torre", "Apartamento", "Autorizó", "Estado",
+            "Hora salida", "Duración", "Registró", "Entrada manual",
+        ]
+    )
+    for v in visits:
+        entrada = v.entry_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA)
+        salida = v.exit_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if v.exit_at else None
+        dur = format_duration(v.exit_at - v.entry_at) if v.exit_at and v.entry_at else ""
+        ws.append(
+            [
+                entrada.strftime("%d/%m/%Y"),
+                entrada.strftime("%H:%M"),
+                v.visitor_name,
+                v.id_number or "",
+                v.visitor_role,
+                v.subject,
+                v.tower,
+                v.apartment,
+                names.get(v.resident_id, ""),
+                v.status,
+                salida.strftime("%H:%M") if salida else "",
+                dur,
+                names.get(v.entry_guard_id, ""),
+                "sí" if v.manual else "no",
+            ]
+        )
+    buf = io.BytesIO()
+    wb.save(buf)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="vie_ingresos_{d1.isoformat()}_{d2.isoformat()}.xlsx"'},
     )

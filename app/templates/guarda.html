@@ -44,6 +44,7 @@
 
 <h1>Ingresos de hoy</h1>
 <section class="card">
+  <div class="table-wrap">
   {% if visits %}
   <table>
     <thead><tr><th>Visitante</th><th>Destino</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
@@ -64,6 +65,7 @@
   {% else %}
   <p class="hint">Sin ingresos registrados hoy.</p>
   {% endif %}
+  </div>
 </section>
 {% endblock %}
 

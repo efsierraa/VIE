@@ -6,3 +6,5 @@ venv/
 .env
 .pytest_cache/
 .DS_Store
+secrets.txt
+VIE_feedback/*
