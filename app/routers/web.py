@@ -23,7 +23,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 BOGOTA = ZoneInfo("America/Bogota")
 
-HOME = {"admin": "/admin", "celador": "/celador", "residente": "/residente"}
+HOME = {"admin": "/admin", "guarda": "/guarda", "residente": "/residente"}
 
 
 def fmt_dt(dt) -> str:
@@ -123,13 +123,13 @@ def residente_page(
     )
 
 
-# --- Celador -----------------------------------------------------------------
+# --- Guarda -----------------------------------------------------------------
 
 
-@router.get("/celador", response_class=HTMLResponse)
-def celador_page(
+@router.get("/guarda", response_class=HTMLResponse)
+def guarda_page(
     request: Request,
-    user: User = Depends(require_page("celador")),
+    user: User = Depends(require_page("guarda")),
     db: Session = Depends(get_db),
 ):
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
@@ -143,7 +143,7 @@ def celador_page(
     )
     return templates.TemplateResponse(
         request,
-        "celador.html",
+        "guarda.html",
         {"user": user, "visits": visits, "names": name_map(db, visits)},
     )
 

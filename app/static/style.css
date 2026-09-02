@@ -126,7 +126,7 @@ button.danger:hover { background: #a91e1e; }
   white-space: nowrap;
 }
 .chip.role-admin { background: #ede7f6; color: #4527a0; }
-.chip.role-celador { background: #e0f7fa; color: #00695c; }
+.chip.role-guarda { background: #e0f7fa; color: #00695c; }
 .chip.role-residente { background: var(--verde-suave); color: var(--verde-oscuro); }
 .chip.status-pendiente { background: var(--alerta-suave); color: #8d6e00; }
 .chip.status-dentro { background: var(--info-suave); color: #1565c0; }

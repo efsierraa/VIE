@@ -10,16 +10,16 @@ def test_anon_redirige_a_login(client):
 def test_paginas_por_rol(client):
     login(client, "residente1")
     assert client.get("/residente").status_code == 200
-    assert client.get("/celador").status_code == 403
+    assert client.get("/guarda").status_code == 403
     assert client.get("/admin").status_code == 403
 
-    login(client, "celador1")
-    assert client.get("/celador").status_code == 200
+    login(client, "guarda1")
+    assert client.get("/guarda").status_code == 200
     assert client.get("/residente").status_code == 403
 
     login(client, "admin1")
     assert client.get("/admin").status_code == 200
-    assert client.get("/celador").status_code == 403
+    assert client.get("/guarda").status_code == 403
 
 
 def test_api_rechaza_roles_equivocados(client):
@@ -29,18 +29,18 @@ def test_api_rechaza_roles_equivocados(client):
     r = client.post("/api/users", json={"username": "xy", "password": "clave123", "full_name": "X Y", "role": "admin"})
     assert r.status_code == 403
 
-    login(client, "celador1")
+    login(client, "guarda1")
     r = client.post("/api/visits", json={"visitor_name": "A", "subject": "B", "visitor_role": "visitante", "hours": 2})
     assert r.status_code == 403
     r = client.post("/api/users", json={"username": "xy", "password": "clave123", "full_name": "X Y", "role": "admin"})
     assert r.status_code == 403
 
 
-def test_admin_crea_celador(client):
+def test_admin_crea_guarda(client):
     login(client, "admin1")
     r = client.post(
         "/api/users",
-        json={"username": "celadorx", "password": "clave123", "full_name": "Celador X", "role": "celador"},
+        json={"username": "guardax", "password": "clave123", "full_name": "Guarda X", "role": "guarda"},
     )
     assert r.status_code == 200
 

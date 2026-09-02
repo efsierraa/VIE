@@ -25,7 +25,7 @@ def test_flujo_completo_entrada_salida(client):
     assert j["visit"]["tower"] == "1"
     assert j["visit"]["apartment"] == "101"
 
-    login(client, "celador1")
+    login(client, "guarda1")
     r = client.post("/api/scan", json={"token": token, "action": "entrada"})
     assert r.status_code == 200
     assert r.json()["visit"]["status"] == "dentro"
@@ -48,7 +48,7 @@ def test_qr_alterado_rechazado(client):
     j = _crear_visita(client, "Visita Alterada")
     token_malo = j["token"][:-1] + ("A" if j["token"][-1] != "A" else "B")
 
-    login(client, "celador1")
+    login(client, "guarda1")
     r = client.post("/api/scan", json={"token": token_malo, "action": "entrada"})
     assert r.status_code == 400
     assert "alterado" in r.json()["detail"]
@@ -64,14 +64,14 @@ def test_qr_expirado_rechazado(client):
     db.commit()
     db.close()
 
-    login(client, "celador1")
+    login(client, "guarda1")
     r = client.post("/api/scan", json={"token": j["token"], "action": "entrada"})
     assert r.status_code == 400
     assert "expirado" in r.json()["detail"]
 
 
 def test_entrada_manual(client):
-    login(client, "celador1")
+    login(client, "guarda1")
     r = client.post(
         "/api/visits/manual",
         json={

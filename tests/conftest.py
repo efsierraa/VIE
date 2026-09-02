@@ -23,7 +23,7 @@ def database():
     db.add_all(
         [
             User(username="admin1", password_hash=hash_password("clave123"), full_name="Administración", role="admin"),
-            User(username="celador1", password_hash=hash_password("clave123"), full_name="Celador de Turno", role="celador"),
+            User(username="guarda1", password_hash=hash_password("clave123"), full_name="Guarda de Turno", role="guarda"),
             User(username="residente1", password_hash=hash_password("clave123"), full_name="Residenta Uno", role="residente", tower="1", apartment="101"),
             User(username="residente2", password_hash=hash_password("clave123"), full_name="Residente Dos", role="residente", tower="2", apartment="202"),
         ]

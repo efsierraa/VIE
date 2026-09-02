@@ -3,7 +3,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from app.database import Base
 from app.utils import utcnow
 
-ROLES = ("admin", "celador", "residente")
+ROLES = ("admin", "guarda", "residente")
 VISITOR_ROLES = ("visitante", "domiciliario")
 VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24)
@@ -16,7 +16,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(120), nullable=False)
-    role = Column(String(20), nullable=False)  # admin | celador | residente
+    role = Column(String(20), nullable=False)  # admin | guarda | residente
     tower = Column(String(10))
     apartment = Column(String(10))
     active = Column(Boolean, default=True, nullable=False)

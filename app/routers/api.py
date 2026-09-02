@@ -141,13 +141,13 @@ def cancel_visit(
     return {"ok": True, "visit": visit_dict(visit)}
 
 
-# --- Celador ---------------------------------------------------------------
+# --- Guarda ---------------------------------------------------------------
 
 
 @router.post("/scan")
 def scan(
     data: ScanIn,
-    guard: User = Depends(require_api("celador")),
+    guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
     if data.action not in ("entrada", "salida"):
@@ -189,7 +189,7 @@ def scan(
 @router.post("/visits/manual")
 def manual_entry(
     data: ManualIn,
-    guard: User = Depends(require_api("celador")),
+    guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
     visitor_name = data.visitor_name.strip()
