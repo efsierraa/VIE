@@ -38,7 +38,7 @@
 
 <details class="card">
   <summary>Importar usuarios desde CSV</summary>
-  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code>. Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV (delimitado por comas)".</p>
+  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code>. Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
   <form id="csv-form" class="form inline">
     <input type="file" id="csv-file" accept=".csv,text/csv" required>
     <button type="submit">Importar</button>

@@ -74,15 +74,36 @@ $env:VIE_DATABASE_URL = "postgresql://...neon.tech/neondb?sslmode=require"
 
 ### Importar usuarios por CSV
 
-Administración → "Importar usuarios desde CSV". Primera fila del archivo:
+Administración → "Importar usuarios desde CSV". Hay un archivo de ejemplo listo para copiar en la propia app: `/static/ejemplo_usuarios.csv`.
 
-```
+**Formato**: la primera fila debe ser exactamente el encabezado, en este orden:
+
+| Columna | Obligatoria | Reglas |
+|---|---|---|
+| `nombres` | Sí | Nombres de pila |
+| `apellidos` | Sí | Apellidos |
+| `usuario` | Sí | Mínimo 3 caracteres, sin espacios; se guarda en minúsculas; no puede repetirse |
+| `clave` | Sí | Mínimo 6 caracteres. El usuario puede cambiarla después en "Mi clave" |
+| `rol` | Sí | `residente`, `guarda` o `admin` |
+| `torre` | Solo residentes | Número o letra de la torre (vacía para guarda/admin) |
+| `apartamento` | Solo residentes | Ej: `502` (vacío para guarda/admin) |
+
+Ejemplo completo:
+
+```csv
 nombres,apellidos,usuario,clave,rol,torre,apartamento
 Camila,Rojas,camilar,clave123,residente,3,301
-Pedro,Gómez,pgomez,clave123,guarda,,
+Pedro,Gómez,pgomez,clave456,guarda,,
+Laura,Restrepo,lrestrepo,clave789,residente,5,1204
 ```
 
-Roles válidos: `residente`, `guarda`, `admin`. Un residente requiere torre y apartamento. Las filas con errores se reportan sin detener la importación.
+**Reglas y consejos**
+
+- Se toleran espacios alrededor de los valores, pero lo limpio es no ponerlos.
+- Codificación UTF-8. Desde Excel: "Guardar como → **CSV UTF-8 (delimitado por comas)**". Ojo: en Excel en español NO uses "CSV (delimitado por punto y coma)" — el importador espera comas (también acepta el CSV clásico de Windows, codificación cp1252).
+- Las líneas vacías se ignoran. No agregues columnas extra ni cambies el orden.
+- Un residente sin torre y apartamento se rechaza; guarda y admin las dejan vacías.
+- Si una fila falla (usuario repetido, rol inválido, clave corta...), el resto se importa igual y al final se listan los errores con su número de línea.
 
 Listo: entra a `https://vie-XXXX.onrender.com` con esa cuenta y crea los residentes y guardas desde la pantalla de administración.
 
