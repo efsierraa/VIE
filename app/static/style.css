@@ -265,6 +265,16 @@ td small { color: var(--gris-texto); }
 .pkg-resultados:empty { display: none; }
 .pkg-resultados button { text-align: left; background: #eceff1; color: #37474f; font-size: 0.9rem; }
 .pkg-resultados button:hover { background: #cfd8dc; }
+
+/* Checkbox de opción con texto */
+label.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #263238;
+}
+label.check input { width: auto; margin: 0; }
 .mode-row .mode { flex: 1; background: #eceff1; color: #37474f; }
 .mode-row .mode.active { background: var(--verde); color: #fff; }
 

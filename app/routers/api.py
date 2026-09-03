@@ -556,13 +556,16 @@ def decodificar_foto(data_uri: str) -> tuple[bytes, str]:
     return salida.getvalue(), "image/jpeg"
 
 
-def package_dict(p: Package, include_photo: bool = False) -> dict:
+def package_dict(p: Package, include_photo: bool = False, include_cedula: bool = False) -> dict:
     d = {
         "id": p.id,
         "uuid": p.uuid,
         "short_code": p.short_code,
         "description": p.description,
         "status": p.status,
+        "tercero": p.tercero,
+        "nombre_tercero": p.nombre_tercero,
+        "cedula_tercero": p.cedula_tercero,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "delivered_at": p.delivered_at.isoformat() if p.delivered_at else None,
         "confirmed_at": p.confirmed_at.isoformat() if p.confirmed_at else None,
@@ -570,23 +573,26 @@ def package_dict(p: Package, include_photo: bool = False) -> dict:
     }
     if include_photo and p.photo:
         d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
+    if include_cedula and p.foto_cedula:
+        d["cedula_data_uri"] = "data:image/jpeg;base64," + base64.b64encode(p.foto_cedula).decode()
     return d
 
 
 def limpiar_fotos_vencidas(db: Session) -> int:
-    """Borra las fotos cuyo plazo (30 días tras entrega) venció; el registro queda sin foto."""
+    """Borra las fotos (paquete y cédula) cuyo plazo (30 días tras entrega) venció."""
     vencidos = (
         db.query(Package)
         .filter(
             Package.photo_delete_after.isnot(None),
             Package.photo_delete_after < utcnow(),
-            Package.photo.isnot(None),
+            Package.photo.isnot(None) | Package.foto_cedula.isnot(None),
         )
         .all()
     )
     for p in vencidos:
         p.photo = None
         p.photo_mime = None
+        p.foto_cedula = None
     if vencidos:
         db.commit()
     return len(vencidos)
@@ -699,6 +705,8 @@ def escanear_paquete(
             raise HTTPException(400, "QR de paquete inválido o alterado")
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    if pkg.tercero:
+        raise HTTPException(400, "Este paquete no tiene QR: búscalo por cédula o nombre en la sección de no registrados")
     residente = db.get(User, pkg.resident_id)
     return {
         "ok": True,
@@ -709,6 +717,104 @@ def escanear_paquete(
             "apartment": residente.apartment,
         },
     }
+
+
+class PackageManualIn(BaseModel):
+    nombre: str
+    cedula: str
+    description: str | None = None
+    photo_b64: str
+    cedula_b64: str
+
+
+@router.post("/packages/manual")
+def registrar_paquete_tercero(
+    data: PackageManualIn,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    """Paquete para alguien sin cuenta: nombre + cédula + foto de la cédula reemplazan al QR."""
+    nombre = data.nombre.strip()
+    cedula = data.cedula.strip()
+    if not nombre or not cedula:
+        raise HTTPException(400, "Nombre y cédula son obligatorios")
+    if len(nombre) > 120 or len(cedula) > 30:
+        raise HTTPException(400, "Nombre o cédula demasiado largos")
+    description = (data.description or "").strip() or None
+    if description and len(description) > 200:
+        raise HTTPException(400, "La descripción es demasiado larga")
+    try:
+        foto, mime = decodificar_foto(data.photo_b64)
+        foto_cedula, _ = decodificar_foto(data.cedula_b64)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    pkg = Package(
+        uuid=str(uuid4()),
+        resident_id=guard.id,  # placeholder hasta que administración asigne un residente
+        description=description,
+        photo=foto,
+        photo_mime=mime,
+        tercero=True,
+        nombre_tercero=nombre,
+        cedula_tercero=cedula,
+        foto_cedula=foto_cedula,
+    )
+    db.add(pkg)
+    db.commit()
+    db.refresh(pkg)
+    log.info("paquete_tercero_registrado cedula=%s por=%s", cedula, guard.username)
+    return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.get("/packages/terceros")
+def buscar_paquetes_terceros(
+    q: str = "",
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    """Paquetes sin residente, en portería: buscar por cédula o nombre para entregar."""
+    query = db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria")
+    q = q.strip()
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(Package.cedula_tercero.ilike(like), Package.nombre_tercero.ilike(like)))
+    pkgs = query.order_by(Package.created_at.desc()).limit(10).all()
+    return {"ok": True, "paquetes": [package_dict(p, include_photo=True, include_cedula=True) for p in pkgs]}
+
+
+class AsignarIn(BaseModel):
+    username: str
+
+
+@router.post("/packages/{package_uuid}/asignar")
+def asignar_paquete(
+    package_uuid: str,
+    data: AsignarIn,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Administración registra al residente nuevo y le asigna el paquete: gana QR y aparece en su app."""
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if not pkg.tercero:
+        raise HTTPException(400, "Este paquete ya tiene residente asignado")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "Solo se pueden asignar paquetes que sigan en portería")
+    residente = (
+        db.query(User)
+        .filter(User.username == data.username.strip().lower(), User.role == "residente", User.active.is_(True))
+        .first()
+    )
+    if residente is None:
+        raise HTTPException(400, "Residente no encontrado o no válido")
+    pkg.resident_id = residente.id
+    pkg.tercero = False
+    pkg.short_code = _codigo_unico(db, Package)
+    db.commit()
+    log.info("paquete_asignado codigo=%s a=%s por=%s", pkg.short_code, residente.username, admin.username)
+    return {"ok": True, "package": package_dict(pkg)}
 
 
 @router.post("/packages/{package_uuid}/entregar")

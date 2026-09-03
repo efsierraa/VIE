@@ -221,3 +221,142 @@ def test_export_incluye_hoja_paquetes(client):
     wb = openpyxl.load_workbook(BytesIO(r.content))
     assert "Paquetes" in wb.sheetnames
     assert "Ingresos" in wb.sheetnames
+
+
+def test_paquete_tercero_flujo(client):
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={
+            "nombre": "Nuevo Vecino",
+            "cedula": "1020304050",
+            "description": "paquete de fontanería",
+            "photo_b64": FOTO,
+            "cedula_b64": FOTO,
+        },
+    )
+    assert r.status_code == 200, r.json()
+    pkg = r.json()["package"]
+    assert pkg["tercero"] is True
+    assert pkg["short_code"] is None  # sin QR: la cédula es la llave
+
+    # un residente NO lo ve en su app (los paquetes tercero no tienen dueño con cuenta)
+    login(client, "residente1")
+    mios = client.get("/api/packages/mine").json()
+    assert all(p["uuid"] != pkg["uuid"] for p in mios["packages"])
+
+    # el guarda busca por cédula y por nombre: ve fotos de paquete y cédula
+    login(client, "guarda1")
+    lista = client.get("/api/packages/terceros", params={"q": "1020304050"}).json()["paquetes"]
+    assert len(lista) == 1
+    assert lista[0]["photo_data_uri"].startswith("data:image/")
+    assert lista[0]["cedula_data_uri"].startswith("data:image/")
+    assert len(client.get("/api/packages/terceros", params={"q": "Nuevo"}).json()["paquetes"]) == 1
+
+    # entrega con cédula
+    r = client.post(f"/api/packages/{pkg['uuid']}/entregar")
+    assert r.status_code == 200
+
+    # ya no aparece en la búsqueda (solo en_porteria)
+    restantes = client.get("/api/packages/terceros").json()["paquetes"]
+    assert all(p["uuid"] != pkg["uuid"] for p in restantes)
+
+
+def test_paquete_tercero_asignar_a_residente_nuevo(client):
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombre": "Vecino Pendiente", "cedula": "98765", "photo_b64": FOTO, "cedula_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+
+    # administración registra al residente nuevo y asigna el paquete
+    login(client, "admin1")
+    r = client.post(
+        "/api/users",
+        json={
+            "nombres": "Vecino", "apellidos": "Nuevo", "username": "vecinonuevo",
+            "password": "clave123", "role": "residente", "tower": "6", "apartment": "601",
+        },
+    )
+    assert r.status_code == 200
+    r = client.post(f"/api/packages/{pkg['uuid']}/asignar", json={"username": "vecinonuevo"})
+    assert r.status_code == 200
+    j = r.json()["package"]
+    assert j["tercero"] is False
+    assert j["short_code"]
+
+    # el residente nuevo ya lo ve con QR en su app
+    login(client, "vecinonuevo")
+    r = client.get("/api/packages/mine")
+    assert r.json()["pendientes"] == 1
+    assert r.json()["packages"][0]["short_code"] == j["short_code"]
+    assert "qr_data_uri" in r.json()["packages"][0]
+
+    # doble asignación no procede
+    login(client, "admin1")
+    r = client.post(f"/api/packages/{pkg['uuid']}/asignar", json={"username": "vecinonuevo"})
+    assert r.status_code == 400
+
+
+def test_paquete_tercero_permisos(client):
+    login(client, "residente1")
+    r = client.post("/api/packages/manual", json={"nombre": "x", "cedula": "y", "photo_b64": FOTO, "cedula_b64": FOTO})
+    assert r.status_code == 403
+    r = client.post("/api/packages/abc/asignar", json={"username": "residente1"})
+    assert r.status_code == 403
+    login(client, "guarda1")
+    r = client.post("/api/packages/abc/asignar", json={"username": "residente1"})
+    assert r.status_code == 403  # asignar es exclusivo de administración
+
+
+def test_paquete_tercero_validacion(client):
+    login(client, "guarda1")
+    r = client.post("/api/packages/manual", json={"nombre": "", "cedula": "123", "photo_b64": FOTO, "cedula_b64": FOTO})
+    assert r.status_code == 400
+    r = client.post("/api/packages/manual", json={"nombre": "Alguien", "cedula": "123", "photo_b64": FOTO})
+    assert r.status_code == 422  # falta la foto de la cédula
+
+
+def test_limpieza_borra_tambien_foto_cedula(client):
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombre": "Cedula Limpia", "cedula": "556677", "photo_b64": FOTO, "cedula_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+    client.post(f"/api/packages/{pkg['uuid']}/entregar")
+
+    db = SessionLocal()
+    p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
+    assert p.foto_cedula is not None
+    p.photo_delete_after = utcnow() - timedelta(minutes=1)
+    db.commit()
+    db.close()
+
+    db = SessionLocal()
+    limpiar_fotos_vencidas(db)
+    p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
+    assert p.photo is None
+    assert p.foto_cedula is None  # dato sensible: mismo plazo de borrado
+    db.close()
+
+
+def test_export_incluye_hoja_paquetes(client):
+    import openpyxl
+
+    login(client, "guarda1")
+    _registrar_paquete(client)
+    client.post(
+        "/api/packages/manual",
+        json={"nombre": "Tercero Excel", "cedula": "204060", "photo_b64": FOTO, "cedula_b64": FOTO},
+    )
+    login(client, "admin1")
+    r = client.get("/admin/exportar")
+    assert r.status_code == 200
+    wb = openpyxl.load_workbook(BytesIO(r.content))
+    assert "Paquetes" in wb.sheetnames
+    assert "Ingresos" in wb.sheetnames
+    hoja = wb["Paquetes"]
+    encabezados = [c.value for c in hoja[1]]
+    assert "Destinatario" in encabezados and "Cédula" in encabezados

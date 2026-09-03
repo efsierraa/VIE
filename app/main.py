@@ -13,7 +13,8 @@ from app.routers import api, web
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
     Base.metadata.create_all(engine)
-    cols = {c["name"] for c in inspect(engine).get_columns("users")}
+    insp = inspect(engine)
+    cols = {c["name"] for c in insp.get_columns("users")}
     faltantes = {"nombres", "apellidos"} - cols
     if faltantes:
         with engine.begin() as conn:
@@ -26,6 +27,15 @@ def _ensure_schema():
                 u.nombres = partes[0] or u.username
                 u.apellidos = partes[1] if len(partes) > 1 else "-"
             db.commit()
+    if "tercero" not in {c["name"] for c in insp.get_columns("packages")}:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero BOOLEAN DEFAULT 0 NOT NULL")
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN nombre_tercero VARCHAR(120)")
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN cedula_tercero VARCHAR(30)")
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN foto_cedula BLOB")
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_packages_cedula_tercero ON packages (cedula_tercero)"
+            )
 
 
 @asynccontextmanager

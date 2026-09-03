@@ -234,8 +234,16 @@ def admin_page(
         "dentro": db.query(Visit).filter(Visit.status == "dentro").count(),
         "pendientes": db.query(Visit).filter(Visit.status == "pendiente").count(),
         "paquetes": db.query(Package).filter(Package.status == "en_porteria").count(),
+        "sin_residente": db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria").count(),
         "activos": db.query(User).filter(User.active.is_(True)).count(),
     }
+    terceros = (
+        db.query(Package)
+        .filter(Package.tercero.is_(True), Package.status == "en_porteria")
+        .order_by(Package.created_at.desc())
+        .limit(20)
+        .all()
+    )
     return templates.TemplateResponse(
         request,
         "admin.html",
@@ -245,6 +253,7 @@ def admin_page(
             "users": users,
             "names": name_map(db, visits),
             "stats": stats,
+            "terceros": terceros,
             "f_date": date or "",
             "f_tower": tower or "",
             "f_status": status or "",
@@ -336,21 +345,31 @@ def _hoja_paquetes(wb, pkgs, usuarios):
     ws = wb.create_sheet("Paquetes")
     ws.append(
         [
-            "Fecha registro", "Residente", "Torre", "Apartamento", "Descripción",
+            "Fecha registro", "Destinatario", "Cédula", "Torre", "Apartamento", "Descripción",
             "Estado", "Entregado", "Confirmado", "Entregó",
         ]
     )
     for p in pkgs:
-        residente = usuarios.get(p.resident_id)
         creado = p.created_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.created_at else None
         entregado = p.delivered_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.delivered_at else None
         confirmado = p.confirmed_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.confirmed_at else None
+        if p.tercero:
+            destinatario = (p.nombre_tercero or "") + " (no registrado)"
+            cedula = p.cedula_tercero or ""
+            torre, apto = "", ""
+        else:
+            residente = usuarios.get(p.resident_id)
+            destinatario = residente.nombre_completo if residente else ""
+            cedula = ""
+            torre = residente.tower if residente else ""
+            apto = residente.apartment if residente else ""
         ws.append(
             [
                 creado.strftime("%d/%m/%Y %H:%M") if creado else "",
-                residente.nombre_completo if residente else "",
-                residente.tower if residente else "",
-                residente.apartment if residente else "",
+                destinatario,
+                cedula,
+                torre,
+                apto,
                 p.description or "",
                 p.status,
                 entregado.strftime("%d/%m/%Y %H:%M") if entregado else "",

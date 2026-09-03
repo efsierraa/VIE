@@ -19,6 +19,16 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 4. El residente **confirma la recepción** (o marca "No lo recibí" → queda en disputa para administración).
 5. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
 
+### Paquetes para alguien NO registrado
+
+Cuando el paquete es de una persona sin cuenta (lo más probable: un residente nuevo), el guarda marca **"El destinatario NO está registrado"** al registrarlo:
+
+1. Digita **nombre y cédula**, toma la **foto del paquete** y la **foto de la cédula**
+2. El paquete **no tiene QR**: la cédula es la llave. En "Entregar paquete → No registrado" el guarda busca por cédula o nombre, compara a la persona con la foto de la cédula y marca la entrega
+3. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana un QR y el residente lo ve en su app
+4. Si nunca se asigna, el paquete se entrega con la cédula y queda en el historial
+5. Las fotos (paquete y cédula) se borran solas 30 días después de la entrega
+
 Si la app falla, el guarda registra a mano (entrada manual) o se vuelve al método de siempre: llamar y anotar.
 
 ## Stack

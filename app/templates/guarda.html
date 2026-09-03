@@ -47,12 +47,31 @@
 <section class="card">
   <h2>Registrar paquete</h2>
   <form id="pkg-form" class="form">
-    <label>Residente
-      <input id="pkg-residente" placeholder='Ej: "Pérez" o "T4 1005"' autocomplete="off">
+    <label class="check">
+      <input type="checkbox" id="pkg-es-tercero">
+      El destinatario NO está registrado (sin QR: se entrega con cédula)
     </label>
-    <p class="hint">Por nombre o apellido; por destino escribe torre y apartamento juntos: T4 1005, 4-1005, T4.1005.</p>
-    <div id="pkg-resultados" class="pkg-resultados"></div>
-    <input type="hidden" id="pkg-resident-id">
+    <div id="pkg-bloque-residente">
+      <label>Residente
+        <input id="pkg-residente" placeholder='Ej: "Pérez" o "T4 1005"' autocomplete="off">
+      </label>
+      <p class="hint">Por nombre o apellido; por destino escribe torre y apartamento juntos: T4 1005, 4-1005, T4.1005.</p>
+      <div id="pkg-resultados" class="pkg-resultados"></div>
+      <input type="hidden" id="pkg-resident-id">
+    </div>
+    <div id="pkg-bloque-tercero" class="hidden">
+      <label>Nombre del destinatario
+        <input id="pkg-tercero-nombre" maxlength="120">
+      </label>
+      <label>Cédula
+        <input id="pkg-tercero-cedula" maxlength="30">
+      </label>
+      <label>Foto de la cédula
+        <input type="file" id="pkg-foto-cedula" accept="image/*">
+      </label>
+      <img id="pkg-cedula-preview" class="pkg-preview hidden" alt="Vista previa de la cédula">
+      <p class="hint">Sin QR: la entrega se hará comparando la cédula. Administración verá la alerta para registrar al residente.</p>
+    </div>
     <label>Descripción (opcional)
       <input id="pkg-desc" maxlength="200" placeholder="Ej: caja Amazon, farmacia">
     </label>
@@ -74,6 +93,14 @@
     <button type="submit">Buscar</button>
   </form>
   <div id="pkg-entrega"></div>
+
+  <h2>No registrado (entrega con cédula)</h2>
+  <p class="hint">Busca por cédula o nombre, compara a la persona con la foto de la cédula y marca la entrega:</p>
+  <form id="tercero-form" class="form inline">
+    <input id="tercero-q" placeholder="Cédula o nombre" autocomplete="off">
+    <button type="submit">Buscar</button>
+  </form>
+  <div id="tercero-resultados"></div>
 </section>
 
 <h1>Ingresos de hoy</h1>
