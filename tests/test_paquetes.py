@@ -346,12 +346,14 @@ def test_registro_de_entregas_visible_para_cotejo(client):
     page = client.get("/guarda")
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
+    assert "caja frágil" in page.text  # la descripción también sirve para cotejar
 
     # administración ve la trazabilidad completa: estado, quién entregó y cuándo
     login(client, "admin1")
     page = client.get("/admin")
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
+    assert "caja frágil" in page.text
     assert "entregado" in page.text
     assert "Historial de paquetes" in page.text
 

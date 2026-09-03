@@ -159,7 +159,7 @@
     <tbody>
     {% for item in paquetes_hist %}
     <tr>
-      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% else %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}</td>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% else %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}</td>
       <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
