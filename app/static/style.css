@@ -110,9 +110,17 @@ button, .button {
 }
 button:hover, .button:hover { background: var(--verde-oscuro); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.small { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
-button.danger { background: var(--error); }
-button.danger:hover { background: #a91e1e; }
+button.small {
+  padding: 0.1rem 0.15rem;
+  margin-right: 0.5rem;
+  font-size: 0.85rem;
+  background: none;
+  color: var(--verde-oscuro);
+  text-decoration: underline;
+}
+button.small:hover { background: none; color: var(--verde); }
+button.small.danger { color: var(--error); }
+button.small.danger:hover { background: none; color: #a91e1e; }
 
 .row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
 .row label { flex: 1 1 140px; min-width: 0; }
