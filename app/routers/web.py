@@ -1,4 +1,3 @@
-import io
 import base64
 import io
 import logging
@@ -6,9 +5,10 @@ from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import openpyxl
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -22,18 +22,36 @@ from app.auth import (
 )
 from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
-from app.models import Package, Visit, User
+from app.models import PACKAGE_STATUS, VISIT_STATUS, Package, Visit, User
 from app.routers.api import qr_data_uri
 from app.security import sign_package
 from app.utils import format_duration, utcnow
 
 log = logging.getLogger("vie")
-
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 BOGOTA = ZoneInfo("America/Bogota")
 
 HOME = {"admin": "/admin", "guarda": "/guarda", "residente": "/residente"}
+
+NAVEGACION = {
+    "guarda": [
+        ("ingresos", "/guarda", "Ingresos"),
+        ("paquetes", "/guarda/paquetes", "Paquetes"),
+    ],
+    "admin": [
+        ("inicio", "/admin", "Inicio"),
+        ("cuentas", "/admin/cuentas", "Cuentas"),
+        ("historial", "/admin/historial", "Historial"),
+    ],
+}
+
+
+def nav_de(role: str, activa: str | None = None) -> list[dict]:
+    return [
+        {"url": url, "nombre": nombre, "activa": clave == activa}
+        for clave, url, nombre in NAVEGACION.get(role, [])
+    ]
 
 
 def fmt_dt(dt) -> str:
@@ -54,8 +72,17 @@ templates.env.filters["fdate"] = fmt_date
 templates.env.filters["dur"] = format_duration
 
 
+def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
+    ids = {v.resident_id for v in visits} | {v.entry_guard_id for v in visits} | {v.exit_guard_id for v in visits}
+    ids.discard(None)
+    if not ids:
+        return {}
+    users = db.query(User).filter(User.id.in_(ids)).all()
+    return {u.id: u.nombre_completo for u in users}
+
+
 def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
-    """Paquetes + datos listos para la tabla de cotejo: destinatario, cédula y quién entregó."""
+    """Paquetes + datos listos para las tablas: destinatario, cédula, foto y quién entregó."""
     ids = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
     usuarios = {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()} if ids else {}
     out = []
@@ -66,22 +93,13 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
                 "p": p,
                 "descripcion": p.description or "",
                 "foto_disponible": p.photo is not None,
-                "destinatario": p.nombre_tercero or (residente.nombre_completo if residente else "—"),
-                "cedula": (p.cedula_tercero or "") if p.tercero else "",
+                "destinatario": (p.nombre_tercero or "—") if p.tercero else (residente.nombre_completo if residente else "—"),
+                "cedula": p.cedula_tercero or "",
                 "destino": "" if p.tercero or not residente else f"T{residente.tower} · {residente.apartment}",
                 "entrego": usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
             }
         )
     return out
-
-
-def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
-    ids = {v.resident_id for v in visits} | {v.entry_guard_id for v in visits} | {v.exit_guard_id for v in visits}
-    ids.discard(None)
-    if not ids:
-        return {}
-    users = db.query(User).filter(User.id.in_(ids)).all()
-    return {u.id: u.nombre_completo for u in users}
 
 
 def day_window_utc(day) -> tuple[datetime, datetime]:
@@ -178,22 +196,11 @@ def residente_page(
     return templates.TemplateResponse(
         request,
         "residente.html",
-        {"user": user, "visits": visits, "paquetes": paquetes, "pendientes": pendientes},
+        {"user": user, "visits": visits, "paquetes": paquetes, "pendientes": pendientes, "tabs": []},
     )
 
 
-# --- Cuenta (cualquier rol) --------------------------------------------------
-
-
-@router.get("/cuenta", response_class=HTMLResponse)
-def cuenta_page(
-    request: Request,
-    user: User = Depends(require_page()),
-):
-    return templates.TemplateResponse(request, "cuenta.html", {"user": user})
-
-
-# --- Guarda -----------------------------------------------------------------
+# --- Guarda · Ingresos -------------------------------------------------------
 
 
 @router.get("/guarda", response_class=HTMLResponse)
@@ -211,6 +218,36 @@ def guarda_page(
         .limit(100)
         .all()
     )
+    return templates.TemplateResponse(
+        request,
+        "guarda.html",
+        {
+            "user": user,
+            "visits": visits,
+            "names": name_map(db, visits),
+            "tabs": nav_de("guarda", "ingresos"),
+        },
+    )
+
+
+# --- Guarda · Paquetes -------------------------------------------------------
+
+
+@router.get("/guarda/paquetes", response_class=HTMLResponse)
+def guarda_paquetes_page(
+    request: Request,
+    user: User = Depends(require_page("guarda")),
+    db: Session = Depends(get_db),
+):
+    pendientes = (
+        db.query(Package)
+        .filter(Package.status == "en_porteria")
+        .order_by(Package.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
+    start_utc, _ = day_window_utc(today_local)
     entregados_hoy = (
         db.query(Package)
         .filter(Package.delivered_at.isnot(None), Package.delivered_at >= start_utc)
@@ -220,46 +257,25 @@ def guarda_page(
     )
     return templates.TemplateResponse(
         request,
-        "guarda.html",
+        "guarda_paquetes.html",
         {
             "user": user,
-            "visits": visits,
-            "names": name_map(db, visits),
-            "paquetes_hoy": paquetes_con_nombres(db, entregados_hoy),
+            "pendientes": paquetes_con_nombres(db, pendientes),
+            "entregados_hoy": paquetes_con_nombres(db, entregados_hoy),
+            "tabs": nav_de("guarda", "paquetes"),
         },
     )
 
 
-# --- Administración ----------------------------------------------------------
+# --- Admin · Inicio (dashboard) ----------------------------------------------
 
 
 @router.get("/admin", response_class=HTMLResponse)
 def admin_page(
     request: Request,
     user: User = Depends(require_page("admin")),
-    date: str | None = None,
-    tower: str | None = None,
-    status: str | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Visit)
-
-    if date:
-        try:
-            day = datetime.strptime(date, "%Y-%m-%d").date()
-        except ValueError:
-            day = None
-        if day:
-            start_utc, end_utc = day_window_utc(day)
-            query = query.filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
-    if tower:
-        query = query.filter(Visit.tower == tower.strip().upper())
-    if status:
-        query = query.filter(Visit.status == status)
-
-    visits = query.order_by(Visit.id.desc()).limit(100).all()
-    users = db.query(User).order_by(User.role, User.username).all()
-
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     start_utc, _ = day_window_utc(today_local)
     stats = {
@@ -270,30 +286,115 @@ def admin_page(
         "sin_residente": db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria").count(),
         "activos": db.query(User).filter(User.active.is_(True)).count(),
     }
-    terceros = (
-        db.query(Package)
-        .filter(Package.tercero.is_(True), Package.status == "en_porteria")
-        .order_by(Package.created_at.desc())
-        .limit(20)
-        .all()
-    )
-    paquetes_hist = paquetes_con_nombres(
-        db, db.query(Package).order_by(Package.id.desc()).limit(50).all()
-    )
     return templates.TemplateResponse(
         request,
         "admin.html",
+        {"user": user, "stats": stats, "tabs": nav_de("admin", "inicio")},
+    )
+
+
+# --- Admin · Cuentas ---------------------------------------------------------
+
+
+@router.get("/admin/cuentas", response_class=HTMLResponse)
+def admin_cuentas_page(
+    request: Request,
+    user: User = Depends(require_page("admin")),
+    db: Session = Depends(get_db),
+):
+    users = db.query(User).order_by(User.role, User.username).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_cuentas.html",
+        {"user": user, "users": users, "tabs": nav_de("admin", "cuentas")},
+    )
+
+
+# --- Admin · Historial (unificado, con filtros adaptables) --------------------
+
+
+@router.get("/admin/historial", response_class=HTMLResponse)
+def admin_historial_page(
+    request: Request,
+    user: User = Depends(require_page("admin")),
+    tipo: str = "ambos",
+    fecha: str = "",
+    estado: str = "",
+    q: str = "",
+    torre: str = "",
+    db: Session = Depends(get_db),
+):
+    if tipo not in ("ingresos", "paquetes", "ambos"):
+        tipo = "ambos"
+    ver_ingresos = tipo in ("ingresos", "ambos")
+    ver_paquetes = tipo in ("paquetes", "ambos")
+
+    # un estado pertenece a un solo dominio: si se filtra por él, el otro dominio no aplica
+    if estado:
+        if estado in VISIT_STATUS and estado not in PACKAGE_STATUS:
+            ver_paquetes = False
+        if estado in PACKAGE_STATUS and estado not in VISIT_STATUS:
+            ver_ingresos = False
+
+    fecha_dia = None
+    if fecha:
+        try:
+            fecha_dia = datetime.strptime(fecha, "%Y-%m-%d").date()
+        except ValueError:
+            fecha_dia = None
+
+    visits = []
+    if ver_ingresos:
+        query = db.query(Visit)
+        if fecha_dia:
+            start_utc, end_utc = day_window_utc(fecha_dia)
+            query = query.filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
+        if estado and estado in VISIT_STATUS:
+            query = query.filter(Visit.status == estado)
+        if q.strip():
+            for token in q.strip().split():
+                like = f"%{token}%"
+                query = query.filter(or_(Visit.visitor_name.ilike(like), Visit.subject.ilike(like)))
+        if torre.strip():
+            query = query.filter(Visit.tower == torre.strip().upper())
+        visits = query.order_by(Visit.id.desc()).limit(100).all()
+
+    pkgs = []
+    if ver_paquetes:
+        query = db.query(Package)
+        if fecha_dia:
+            start_utc, end_utc = day_window_utc(fecha_dia)
+            query = query.filter(Package.created_at >= start_utc, Package.created_at <= end_utc)
+        if estado and estado in PACKAGE_STATUS:
+            query = query.filter(Package.status == estado)
+        if q.strip():
+            for token in q.strip().split():
+                like = f"%{token}%"
+                query = query.filter(
+                    or_(
+                        Package.nombre_tercero.ilike(like),
+                        Package.description.ilike(like),
+                        Package.short_code.ilike(like),
+                    )
+                )
+        pkgs = query.order_by(Package.id.desc()).limit(100).all()
+
+    return templates.TemplateResponse(
+        request,
+        "admin_historial.html",
         {
             "user": user,
+            "tipo": tipo,
+            "ver_ingresos": ver_ingresos,
+            "ver_paquetes": ver_paquetes,
             "visits": visits,
-            "users": users,
-            "names": name_map(db, visits),
-            "stats": stats,
-            "terceros": terceros,
-            "paquetes_hist": paquetes_hist,
-            "f_date": date or "",
-            "f_tower": tower or "",
-            "f_status": status or "",
+            "names": name_map(db, visits) if visits else {},
+            "paquetes_hist": paquetes_con_nombres(db, pkgs) if pkgs else [],
+            "f_fecha": fecha,
+            "f_estado": estado,
+            "f_q": q,
+            "f_torre": torre,
+            "tabs": nav_de("admin", "historial"),
         },
     )
 
@@ -301,10 +402,17 @@ def admin_page(
 @router.get("/admin/exportar")
 def exportar_visitas(
     user: User = Depends(require_page("admin")),
+    ingresos: str = "",
+    paquetes: str = "",
     desde: str = "",
     hasta: str = "",
     db: Session = Depends(get_db),
 ):
+    quiere_ingresos = ingresos == "1"
+    quiere_paquetes = paquetes == "1"
+    if not (quiere_ingresos or quiere_paquetes):
+        raise HTTPException(400, "Elige al menos una opción: ingresos o paquetes")
+
     hoy = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     try:
         d1 = datetime.strptime(desde, "%Y-%m-%d").date() if desde else hoy - timedelta(days=30)
@@ -316,65 +424,68 @@ def exportar_visitas(
         d2 = hoy
     if d1 > d2:
         d1, d2 = d2, d1
-    start_utc, _ = day_window_utc(d1)
-    _, end_utc = day_window_utc(d2)
-    visits = (
-        db.query(Visit)
-        .filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
-        .order_by(Visit.entry_at)
-        .all()
-    )
-    names = name_map(db, visits)
-
-    # Paquetes creados en el mismo rango
-    pkgs = (
-        db.query(Package)
-        .filter(Package.created_at >= start_utc, Package.created_at <= end_utc)
-        .order_by(Package.created_at)
-        .all()
-    )
-    ids_pkg = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
-    usuarios_pkg = {u.id: u for u in db.query(User).filter(User.id.in_(ids_pkg)).all()} if ids_pkg else {}
+    start_utc, end_utc = day_window_utc(d1)[0], day_window_utc(d2)[1]
 
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Ingresos"
-    ws.append(
-        [
-            "Fecha entrada", "Hora entrada", "Visitante", "Identificación", "Rol",
-            "Asunto", "Torre", "Apartamento", "Autorizó", "Estado",
-            "Hora salida", "Duración", "Registró", "Entrada manual",
-        ]
-    )
-    for v in visits:
-        entrada = v.entry_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA)
-        salida = v.exit_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if v.exit_at else None
-        dur = format_duration(v.exit_at - v.entry_at) if v.exit_at and v.entry_at else ""
-        ws.append(
+    hoja_base = wb.active
+    if not quiere_ingresos:
+        wb.remove(hoja_base)  # sin hoja "Sheet" huérfana cuando se exporta solo paquetes
+    if quiere_ingresos:
+        visits = (
+            db.query(Visit)
+            .filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
+            .order_by(Visit.entry_at)
+            .all()
+        )
+        names = name_map(db, visits)
+        hoja_base.title = "Ingresos"
+        hoja_base.append(
             [
-                entrada.strftime("%d/%m/%Y"),
-                entrada.strftime("%H:%M"),
-                v.visitor_name,
-                v.id_number or "",
-                v.visitor_role,
-                v.subject,
-                v.tower,
-                v.apartment,
-                names.get(v.resident_id, ""),
-                v.status,
-                salida.strftime("%H:%M") if salida else "",
-                dur,
-                names.get(v.entry_guard_id, ""),
-                "sí" if v.manual else "no",
+                "Fecha entrada", "Hora entrada", "Visitante", "Identificación", "Rol",
+                "Asunto", "Torre", "Apartamento", "Autorizó", "Estado",
+                "Hora salida", "Duración", "Registró", "Entrada manual",
             ]
         )
+        for v in visits:
+            entrada = v.entry_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA)
+            salida = v.exit_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if v.exit_at else None
+            dur = format_duration(v.exit_at - v.entry_at) if v.exit_at and v.entry_at else ""
+            hoja_base.append(
+                [
+                    entrada.strftime("%d/%m/%Y"),
+                    entrada.strftime("%H:%M"),
+                    v.visitor_name,
+                    v.id_number or "",
+                    v.visitor_role,
+                    v.subject,
+                    v.tower,
+                    v.apartment,
+                    names.get(v.resident_id, ""),
+                    v.status,
+                    salida.strftime("%H:%M") if salida else "",
+                    dur,
+                    names.get(v.entry_guard_id, ""),
+                    "sí" if v.manual else "no",
+                ]
+            )
+
+    if quiere_paquetes:
+        pkgs = (
+            db.query(Package)
+            .filter(Package.created_at >= start_utc, Package.created_at <= end_utc)
+            .order_by(Package.created_at)
+            .all()
+        )
+        ids_pkg = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
+        usuarios_pkg = {u.id: u for u in db.query(User).filter(User.id.in_(ids_pkg)).all()} if ids_pkg else {}
+        _hoja_paquetes(wb, pkgs, usuarios_pkg)
+
     buf = io.BytesIO()
-    _hoja_paquetes(wb, pkgs, usuarios_pkg)
     wb.save(buf)
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="vie_ingresos_{d1.isoformat()}_{d2.isoformat()}.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="vie_{d1.isoformat()}_{d2.isoformat()}.xlsx"'},
     )
 
 
@@ -392,14 +503,13 @@ def _hoja_paquetes(wb, pkgs, usuarios):
         confirmado = p.confirmed_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.confirmed_at else None
         if p.tercero:
             destinatario = (p.nombre_tercero or "") + " (no registrado)"
-            cedula = p.cedula_tercero or ""
             torre, apto = "", ""
         else:
             residente = usuarios.get(p.resident_id)
             destinatario = residente.nombre_completo if residente else ""
-            cedula = ""
             torre = residente.tower if residente else ""
             apto = residente.apartment if residente else ""
+        cedula = p.cedula_tercero or ""
         ws.append(
             [
                 creado.strftime("%d/%m/%Y %H:%M") if creado else "",

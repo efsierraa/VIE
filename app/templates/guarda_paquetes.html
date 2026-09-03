@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Paquetes — Portería — VIE{% endblock %}
+{% block content %}
+<h1>Paquetes</h1>
+
+<h2>Pendientes por entregar</h2>
+<section class="card">
+  <div class="table-wrap">
+  {% if pendientes %}
+  <table>
+    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Recibido</th><th></th></tr></thead>
+    <tbody>
+    {% for item in pendientes %}
+    <tr>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td>{{ item.p.created_at|dt }}</td>
+      <td></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">Para entregar: escanea el QR del residente, digita el código o usa la búsqueda por nombre (no registrados).</p>
+  {% else %}
+  <p class="hint">No hay paquetes pendientes por entregar.</p>
+  {% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Registrar paquete</h2>
+  <form id="pkg-form" class="form">
+    <label class="check">
+      <input type="checkbox" id="pkg-es-tercero">
+      El destinatario NO está registrado (sin QR: se entrega con cédula)
+    </label>
+    <div id="pkg-bloque-residente">
+      <label>Residente
+        <input id="pkg-residente" placeholder='Ej: "Pérez" o "T4 1005"' autocomplete="off">
+      </label>
+      <p class="hint">Por nombre o apellido; por destino escribe torre y apartamento juntos: T4 1005, 4-1005, T4.1005.</p>
+      <div id="pkg-resultados" class="pkg-resultados"></div>
+      <input type="hidden" id="pkg-resident-id">
+    </div>
+    <div id="pkg-bloque-tercero" class="hidden">
+      <label>Nombre del destinatario (como aparece en el paquete)
+        <input id="pkg-tercero-nombre" maxlength="120">
+      </label>
+      <p class="hint">Llega por transportadora, así que no se pide cédula ahora. Al reclamar se coteja el nombre con la cédula y se registra el número.</p>
+    </div>
+    <label>Descripción (opcional)
+      <input id="pkg-desc" maxlength="200" placeholder="Ej: caja Amazon, farmacia">
+    </label>
+    <label>Foto del paquete
+      <input type="file" id="pkg-foto" accept="image/*">
+    </label>
+    <p class="hint">Toma la foto o elige una de la galería. Si la cámara guarda en HEIC, selecciona la opción "Cámara" con formato JPEG.</p>
+    <img id="pkg-preview" class="pkg-preview hidden" alt="Vista previa de la foto">
+    <button type="submit">Registrar paquete</button>
+  </form>
+  <div id="pkg-registro-ok"></div>
+</section>
+
+<section class="card">
+  <h2>Entregar paquete</h2>
+  <p class="hint">Digita el código que muestra el residente (la cámara de la sección Ingresos también lee el QR del paquete):</p>
+  <form id="pkg-scan-form" class="form inline">
+    <input id="pkg-code" placeholder="Ej: K7M2PA" autocomplete="off">
+    <button type="submit">Buscar</button>
+  </form>
+  <div id="pkg-entrega"></div>
+
+  <h2>No registrado (entrega con cédula)</h2>
+  <p class="hint">Busca por nombre, compara el nombre con la cédula que presenta la persona, digita el número de cédula y marca la entrega:</p>
+  <form id="tercero-form" class="form inline">
+    <input id="tercero-q" placeholder="Nombre del destinatario" autocomplete="off">
+    <button type="submit">Buscar</button>
+  </form>
+  <div id="tercero-resultados"></div>
+</section>
+
+<h2>Entregados hoy</h2>
+<section class="card">
+  <div class="table-wrap">
+  {% if entregados_hoy %}
+  <table>
+    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Hora</th><th>Entregó</th></tr></thead>
+    <tbody>
+    {% for item in entregados_hoy %}
+    <tr>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td>{{ item.p.delivered_at|dt }}</td>
+      <td>{{ item.entrego }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin paquetes entregados hoy.</p>
+  {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/porteria.js" defer></script>
+<script src="/static/js/guarda_paquetes.js" defer></script>
+{% endblock %}

@@ -7,9 +7,17 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 ## Cómo funciona
 
+La app se organiza en **páginas por sección** con una barra de navegación inferior en el celular:
+
+- **Guarda · Ingresos**: escáner de entrada/salida, entrada manual, ingresos del día
+- **Guarda · Paquetes**: pendientes por entregar, registro (con o sin QR), entrega por código/cédula, entregados del día
+- **Admin · Inicio**: métricas del día
+- **Admin · Cuentas**: crear cuentas (una a una o importando un CSV), asignar claves, activar/desactivar
+- **Admin · Historial**: selector de tipo (Ingresos / Paquetes / Ambos) con filtros que se adaptan (fecha, estado, texto, torre), exportación a Excel por tipo y rango de fechas, y asignación de paquetes de no registrados — incluso después de entregados
+
 1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** para compartir por WhatsApp — imagen y texto — junto con un **código corto de 6 caracteres**.
 2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
-3. **Administración**: dashboard con métricas del día, crea las cuentas (una a una o **importando un CSV**), asigna claves y **exporta el historial a Excel** por rango de fechas.
+3. **Administración**: supervisa todo desde el historial con trazabilidad completa.
 
 ### Paquetes
 

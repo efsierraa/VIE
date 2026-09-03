@@ -125,10 +125,10 @@ def test_exportar_excel(client):
     client.post("/api/scan", json={"code": code, "action": "entrada"})
 
     login(client, "admin1")
-    r = client.get("/admin/exportar")
+    r = client.get("/admin/exportar?ingresos=1&paquetes=1")
     assert r.status_code == 200
     assert "spreadsheetml" in r.headers["content-type"]
     assert r.content[:2] == b"PK"  # un .xlsx es un zip
 
-    r = client.get("/admin/exportar?desde=2020-01-01&hasta=2040-12-31")
+    r = client.get("/admin/exportar?desde=2020-01-01&hasta=2040-12-31&ingresos=1&paquetes=1")
     assert r.status_code == 200

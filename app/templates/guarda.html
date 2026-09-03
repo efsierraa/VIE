@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Portería — VIE{% endblock %}
+{% block title %}Ingresos — Portería — VIE{% endblock %}
 {% block content %}
-<h1>Portería</h1>
+<h1>Ingresos</h1>
 <section class="card">
   <div class="row mode-row">
     <button id="mode-entrada" class="mode active" type="button">Entrada</button>
@@ -11,10 +11,10 @@
   <div class="row">
     <button id="btn-cam" type="button">Iniciar cámara</button>
   </div>
-  <p class="hint">La cámara reconoce el QR de visitas (entrada/salida) y también el QR de paquetes para entregarlos.</p>
+  <p class="hint">La cámara reconoce el QR de visitas (entrada/salida) y también el QR de paquetes para entregarlos (sección Paquetes).</p>
   <p class="hint">Si la cámara no está disponible, digita el código corto del pase o pega el código largo:</p>
   <form id="token-form" class="form inline">
-    <input id="token-input" placeholder="Ej: K7M2PA o pega el pase completo" required autocomplete="off">
+    <input id="token-input" placeholder='Ej: K7M2PA o pega el pase completo' required autocomplete="off">
     <button type="submit">Validar</button>
   </form>
 </section>
@@ -43,69 +43,17 @@
   </form>
 </details>
 
-<h1>Paquetes</h1>
-<section class="card">
-  <h2>Registrar paquete</h2>
-  <form id="pkg-form" class="form">
-    <label class="check">
-      <input type="checkbox" id="pkg-es-tercero">
-      El destinatario NO está registrado (sin QR: se entrega con cédula)
-    </label>
-    <div id="pkg-bloque-residente">
-      <label>Residente
-        <input id="pkg-residente" placeholder='Ej: "Pérez" o "T4 1005"' autocomplete="off">
-      </label>
-      <p class="hint">Por nombre o apellido; por destino escribe torre y apartamento juntos: T4 1005, 4-1005, T4.1005.</p>
-      <div id="pkg-resultados" class="pkg-resultados"></div>
-      <input type="hidden" id="pkg-resident-id">
-    </div>
-    <div id="pkg-bloque-tercero" class="hidden">
-      <label>Nombre del destinatario (como aparece en el paquete)
-        <input id="pkg-tercero-nombre" maxlength="120">
-      </label>
-      <p class="hint">Llega por transportadora, así que no se pide cédula ahora. Al reclamar se coteja el nombre con la cédula y se registra el número.</p>
-    </div>
-    <label>Descripción (opcional)
-      <input id="pkg-desc" maxlength="200" placeholder="Ej: caja Amazon, farmacia">
-    </label>
-    <label>Foto del paquete
-      <input type="file" id="pkg-foto" accept="image/*">
-    </label>
-    <p class="hint">Toma la foto o elige una de la galería. Si la cámara guarda en HEIC, selecciona la opción "Cámara" con formato JPEG.</p>
-    <img id="pkg-preview" class="pkg-preview hidden" alt="Vista previa de la foto">
-    <button type="submit">Registrar paquete</button>
-  </form>
-  <div id="pkg-registro-ok"></div>
-</section>
-
-<section class="card">
-  <h2>Entregar paquete</h2>
-  <p class="hint">Digita el código que muestra el residente (la cámara de arriba también lee el QR del paquete):</p>
-  <form id="pkg-scan-form" class="form inline">
-    <input id="pkg-code" placeholder="Ej: K7M2PA" autocomplete="off">
-    <button type="submit">Buscar</button>
-  </form>
-  <div id="pkg-entrega"></div>
-
-  <h2>No registrado (entrega con cédula)</h2>
-  <p class="hint">Busca por nombre, compara el nombre con la cédula que presenta la persona, digita el número de cédula y marca la entrega:</p>
-  <form id="tercero-form" class="form inline">
-    <input id="tercero-q" placeholder="Nombre del destinatario" autocomplete="off">
-    <button type="submit">Buscar</button>
-  </form>
-  <div id="tercero-resultados"></div>
-</section>
-
 <h1>Ingresos de hoy</h1>
 <section class="card">
   <div class="table-wrap">
   {% if visits %}
   <table>
-    <thead><tr><th>Visitante</th><th>Destino</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Destino</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
     <tbody>
     {% for v in visits %}
     <tr>
       <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}</td>
+      <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
       <td>{{ v.entry_at|dt }}</td>
@@ -121,33 +69,10 @@
   {% endif %}
   </div>
 </section>
-
-<h1>Paquetes entregados hoy</h1>
-<section class="card">
-  <div class="table-wrap">
-  {% if paquetes_hoy %}
-  <table>
-    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Hora</th><th>Entregó</th></tr></thead>
-    <tbody>
-    {% for item in paquetes_hoy %}
-    <tr>
-      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% else %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
-      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
-      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
-      <td>{{ item.p.delivered_at|dt }}</td>
-      <td>{{ item.entrego }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="hint">Sin paquetes entregados hoy.</p>
-  {% endif %}
-  </div>
-</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
-<script src="/static/js/guarda.js" defer></script>
+<script src="/static/js/porteria.js" defer></script>
+<script src="/static/js/guarda_ingresos.js" defer></script>
 {% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Historial — Administración — VIE{% endblock %}
+{% block content %}
+<h1>Historial</h1>
+
+<section class="card">
+  <div class="tipo-links">
+    <a class="small {{ 'activa' if tipo == 'ingresos' else '' }}" href="/admin/historial?tipo=ingresos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}">Ingresos</a>
+    <a class="small {{ 'activa' if tipo == 'paquetes' else '' }}" href="/admin/historial?tipo=paquetes&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}">Paquetes</a>
+    <a class="small {{ 'activa' if tipo == 'ambos' else '' }}" href="/admin/historial?tipo=ambos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}">Ambos</a>
+  </div>
+
+  <form method="get" action="/admin/historial" class="form filters">
+    <input type="hidden" name="tipo" value="{{ tipo }}">
+    <div class="row">
+      <label>{{ "Fecha de entrada" if tipo != "paquetes" else "Fecha de registro" }}
+        <input type="date" name="fecha" value="{{ f_fecha }}">
+      </label>
+      {% if tipo != "paquetes" %}
+      <label>Torre <input name="torre" value="{{ f_torre }}" size="3"></label>
+      {% endif %}
+    </div>
+    <div class="row">
+      <label>Estado
+        <select name="estado">
+          <option value="">Todos</option>
+          {% if tipo != "paquetes" %}
+          {% for s in ["pendiente", "dentro", "finalizada", "cancelada"] %}
+          <option value="{{ s }}" {% if f_estado == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+          {% endif %}
+          {% if tipo != "ingresos" %}
+          {% for s in ["en_porteria", "entregado", "confirmado", "disputa", "cancelado"] %}
+          <option value="{{ s }}" {% if f_estado == s %}selected{% endif %}>{{ s.replace("_", " ") }}</option>
+          {% endfor %}
+          {% endif %}
+        </select>
+      </label>
+      <label>Texto (visitante/asunto o destinatario/descripción)
+        <input name="q" value="{{ f_q }}" placeholder="Palabras a buscar">
+      </label>
+    </div>
+    <div class="row">
+      <button type="submit">Filtrar</button>
+      <a class="button" href="/admin/historial">Limpiar</a>
+    </div>
+  </form>
+
+  <form method="get" action="/admin/exportar" class="form filters">
+    <input type="hidden" name="tipo" value="{{ tipo }}">
+    <label class="check"><input type="checkbox" name="ingresos" value="1" {% if tipo != "paquetes" %}checked{% endif %}> Ingresos</label>
+    <label class="check"><input type="checkbox" name="paquetes" value="1" {% if tipo != "ingresos" %}checked{% endif %}> Paquetes</label>
+    <label>Desde <input type="date" name="desde"></label>
+    <label>Hasta <input type="date" name="hasta"></label>
+    <button type="submit">Exportar Excel</button>
+  </form>
+</section>
+
+{% if ver_ingresos %}
+<h2>Ingresos</h2>
+<section class="card">
+  <div class="table-wrap">
+  {% if visits %}
+  <table>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Destino</th><th>Autorizó</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
+    <tbody>
+    {% for v in visits %}
+    <tr>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}</td>
+      <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
+      <td>T{{ v.tower }} · {{ v.apartment }}</td>
+      <td>{{ names.get(v.resident_id, "—") }}</td>
+      <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
+      <td>{{ v.entry_at|dt }}</td>
+      <td>{{ v.exit_at|dt }}</td>
+      <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
+      <td>{{ names.get(v.entry_guard_id, "—") }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin ingresos que coincidan con el filtro.</p>
+  {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if ver_paquetes %}
+<h2>Paquetes</h2>
+<section class="card">
+  <div class="table-wrap">
+  {% if paquetes_hist %}
+  <table>
+    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Recibido</th><th>Entregado</th><th>Confirmado</th><th>Entregó</th></tr></thead>
+    <tbody>
+    {% for item in paquetes_hist %}
+    <tr>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><span class="observacion" title="{{ item.descripcion }}">{{ item.descripcion }}</span>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td>{{ item.p.created_at|dt }}</td>
+      <td>{{ item.p.delivered_at|dt }}</td>
+      <td>{{ item.p.confirmed_at|dt }}</td>
+      <td>{{ item.entrego }}</td>
+      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">Los paquetes de no registrados pueden asignarse a un residente aunque ya se hayan entregado: queda vinculado el registro con su dueño real.</p>
+  {% else %}
+  <p class="hint">Sin paquetes que coincidan con el filtro.</p>
+  {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin_historial.js" defer></script>
+{% endblock %}

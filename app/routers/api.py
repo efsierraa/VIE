@@ -818,14 +818,18 @@ def asignar_paquete(
     admin: User = Depends(require_api("admin")),
     db: Session = Depends(get_db),
 ):
-    """Administración registra al residente nuevo y le asigna el paquete: gana QR y aparece en su app."""
+    """Administración vincula el paquete con el residente nuevo.
+
+    Si sigue en portería, gana QR y aparece en su app. Si ya se entregó,
+    solo queda vinculado el registro para la trazabilidad del dueño real.
+    """
     pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
     if pkg is None:
         raise HTTPException(404, "Paquete no encontrado")
     if not pkg.tercero:
         raise HTTPException(400, "Este paquete ya tiene residente asignado")
-    if pkg.status != "en_porteria":
-        raise HTTPException(400, "Solo se pueden asignar paquetes que sigan en portería")
+    if pkg.status == "cancelado":
+        raise HTTPException(400, "No se puede asignar un paquete cancelado")
     residente = (
         db.query(User)
         .filter(User.username == data.username.strip().lower(), User.role == "residente", User.active.is_(True))
@@ -835,9 +839,15 @@ def asignar_paquete(
         raise HTTPException(400, "Residente no encontrado o no válido")
     pkg.resident_id = residente.id
     pkg.tercero = False
-    pkg.short_code = _codigo_unico(db, Package)
+    if pkg.status == "en_porteria":
+        pkg.short_code = _codigo_unico(db, Package)
     db.commit()
-    log.info("paquete_asignado codigo=%s a=%s por=%s", pkg.short_code, residente.username, admin.username)
+    log.info(
+        "paquete_asignado a=%s estado=%s por=%s",
+        residente.username,
+        pkg.status,
+        admin.username,
+    )
     return {"ok": True, "package": package_dict(pkg)}
 
 

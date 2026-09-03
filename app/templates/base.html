@@ -24,6 +24,13 @@
 {% block content %}{% endblock %}
 </main>
 <footer class="foot">VIE — software libre (MIT) · hecho con el corazón</footer>
+{% if tabs %}
+<nav class="tabbar">
+  {% for t in tabs %}
+  <a href="{{ t.url }}" class="{{ 'activa' if t.activa else '' }}">{{ t.nombre }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}
 </body>

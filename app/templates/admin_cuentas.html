@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Cuentas — Administración — VIE{% endblock %}
+{% block content %}
+<h1>Cuentas</h1>
+
+<section class="card">
+  <h2>Nueva cuenta</h2>
+  <form id="user-form" class="form">
+    <div class="row">
+      <label>Nombres <input name="nombres" required></label>
+      <label>Apellidos <input name="apellidos" required></label>
+    </div>
+    <div class="row">
+      <label>Usuario <input name="username" required></label>
+      <label>Clave <input name="password" type="password" required minlength="8"></label>
+    </div>
+    <label>Rol
+      <select name="role" id="role-select">
+        <option value="residente">Residente</option>
+        <option value="guarda">Guarda</option>
+        <option value="admin">Administración</option>
+      </select>
+    </label>
+    <div class="row" id="apt-fields">
+      <label>Torre <input name="tower" placeholder="Ej: 1"></label>
+      <label>Apartamento <input name="apartment" placeholder="Ej: 502"></label>
+    </div>
+    <button type="submit">Crear cuenta</button>
+  </form>
+</section>
+
+<details class="card">
+  <summary>Importar usuarios desde CSV</summary>
+  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code>. Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
+  <form id="csv-form" class="form inline">
+    <input type="file" id="csv-file" accept=".csv,text/csv" required>
+    <button type="submit">Importar</button>
+  </form>
+  <div id="csv-result"></div>
+</details>
+
+<section class="card">
+  <h2>Cuentas</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Torre · Apto</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.username }}</td>
+      <td>{{ u.nombre_completo }}</td>
+      <td><span class="chip role-{{ u.role }}">{{ u.role }}</span></td>
+      <td>{% if u.tower %}T{{ u.tower }} · {{ u.apartment }}{% else %}—{% endif %}</td>
+      <td>{% if u.active %}<span class="chip status-dentro">activa</span>{% else %}<span class="chip status-cancelada">inactiva</span>{% endif %}</td>
+      <td>
+        {% if u.id != user.id %}
+        <button class="small" data-reset="{{ u.id }}" data-nombre="{{ u.nombre_completo }}">Clave</button>
+        <button class="small" data-toggle="{{ u.id }}">{{ "Desactivar" if u.active else "Activar" }}</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="hint">"Clave" asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar).</p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin.js" defer></script>
+{% endblock %}

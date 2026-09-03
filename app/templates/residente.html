@@ -71,7 +71,7 @@
     {% for v in visits %}
       <tr>
         <td>{{ v.visitor_name }}<br><small>{{ v.visitor_role }}</small></td>
-        <td>{{ v.subject }}</td>
+        <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
         <td><strong>{{ v.short_code or "—" }}</strong></td>
         <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
         <td>{{ v.created_at|dt }}</td>
@@ -102,7 +102,7 @@
     {% for item in paquetes %}
     <tr>
       <td><strong>{{ item.p.short_code }}</strong></td>
-      <td>{{ item.p.description or "—" }}</td>
+      <td><span class="observacion" title="{{ item.p.description }}">{{ item.p.description or "—" }}</span></td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
       <td>{{ item.p.delivered_at|dt }}</td>

@@ -289,6 +289,37 @@ def test_paquete_tercero_asignar_a_residente_nuevo(client):
     assert r.status_code == 400
 
 
+def test_asignar_paquete_tercero_ya_entregado(client):
+    """El paquete se entregó a un no registrado; después admin registra al residente
+    y vincula el registro con su dueño real (trazabilidad), sin generar QR."""
+    login(client, "guarda1")
+    r = client.post("/api/packages/manual", json={"nombre": "Entregado a Otro", "photo_b64": FOTO})
+    pkg = r.json()["package"]
+    client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "44332211"})
+
+    login(client, "admin1")
+    r = client.post(
+        "/api/users",
+        json={
+            "nombres": "Dueña", "apellidos": "Real", "username": "duenareal",
+            "password": "clave123", "role": "residente", "tower": "8", "apartment": "802",
+        },
+    )
+    assert r.status_code == 200
+    r = client.post(f"/api/packages/{pkg['uuid']}/asignar", json={"username": "duenareal"})
+    assert r.status_code == 200
+    j = r.json()["package"]
+    assert j["tercero"] is False
+    assert j["short_code"] is None  # ya entregado: sin QR, solo el registro vinculado
+    assert j["cedula_tercero"] == "44332211"  # la evidencia del reclamo se conserva
+
+    # aparece en el historial ya vinculado: dueña real y evidencia de la cédula del reclamo
+    page = client.get("/admin/historial?tipo=paquetes")
+    assert "Dueña Real" in page.text
+    assert "44332211" in page.text
+    assert "Entregado a Otro" not in page.text
+
+
 def test_paquete_tercero_permisos(client):
     login(client, "residente1")
     r = client.post("/api/packages/manual", json={"nombre": "x", "photo_b64": FOTO})
@@ -342,8 +373,8 @@ def test_registro_de_entregas_visible_para_cotejo(client):
     pkg = r.json()["package"]
     client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "777888"})
 
-    # el guarda lo ve en su registro del día, con destinatario y cédula
-    page = client.get("/guarda")
+    # el guarda lo ve en el registro de paquetes, con destinatario y cédula
+    page = client.get("/guarda/paquetes")
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
     assert "caja frágil" in page.text  # la descripción también sirve para cotejar
@@ -359,13 +390,12 @@ def test_registro_de_entregas_visible_para_cotejo(client):
 
     # administración ve la trazabilidad completa: estado, quién entregó y cuándo
     login(client, "admin1")
-    page = client.get("/admin")
+    page = client.get("/admin/historial?tipo=paquetes")
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
     assert "caja frágil" in page.text
     assert "entregado" in page.text
     assert "Ver imagen" in page.text
-    assert "Historial de paquetes" in page.text
     assert client.get(f"/api/packages/{pkg['uuid']}/foto").status_code == 200
 
 
@@ -395,7 +425,7 @@ def test_foto_borrada_tras_plazo_muestra_mensaje(client):
     assert "30 días" in r.text
 
     # y la tabla muestra el aviso en vez del enlace
-    page = client.get("/guarda")
+    page = client.get("/guarda/paquetes")
     assert "Imagen borrada" in page.text
     assert "Ver imagen" not in page.text.split("Foto Vencida")[1].split("</tr>")[0]
 
@@ -410,7 +440,7 @@ def test_export_incluye_hoja_paquetes(client):
         json={"nombre": "Tercero Excel", "photo_b64": FOTO},
     )
     login(client, "admin1")
-    r = client.get("/admin/exportar")
+    r = client.get("/admin/exportar?ingresos=1&paquetes=1")
     assert r.status_code == 200
     wb = openpyxl.load_workbook(BytesIO(r.content))
     assert "Paquetes" in wb.sheetnames
