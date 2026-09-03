@@ -54,6 +54,25 @@ templates.env.filters["fdate"] = fmt_date
 templates.env.filters["dur"] = format_duration
 
 
+def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
+    """Paquetes + datos listos para la tabla de cotejo: destinatario, cédula y quién entregó."""
+    ids = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
+    usuarios = {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()} if ids else {}
+    out = []
+    for p in pkgs:
+        residente = usuarios.get(p.resident_id)
+        out.append(
+            {
+                "p": p,
+                "destinatario": p.nombre_tercero or (residente.nombre_completo if residente else "—"),
+                "cedula": (p.cedula_tercero or "") if p.tercero else "",
+                "destino": "" if p.tercero or not residente else f"T{residente.tower} · {residente.apartment}",
+                "entrego": usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
+            }
+        )
+    return out
+
+
 def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
     ids = {v.resident_id for v in visits} | {v.entry_guard_id for v in visits} | {v.exit_guard_id for v in visits}
     ids.discard(None)
@@ -190,10 +209,22 @@ def guarda_page(
         .limit(100)
         .all()
     )
+    entregados_hoy = (
+        db.query(Package)
+        .filter(Package.delivered_at.isnot(None), Package.delivered_at >= start_utc)
+        .order_by(Package.delivered_at.desc())
+        .limit(50)
+        .all()
+    )
     return templates.TemplateResponse(
         request,
         "guarda.html",
-        {"user": user, "visits": visits, "names": name_map(db, visits)},
+        {
+            "user": user,
+            "visits": visits,
+            "names": name_map(db, visits),
+            "paquetes_hoy": paquetes_con_nombres(db, entregados_hoy),
+        },
     )
 
 
@@ -244,6 +275,9 @@ def admin_page(
         .limit(20)
         .all()
     )
+    paquetes_hist = paquetes_con_nombres(
+        db, db.query(Package).order_by(Package.id.desc()).limit(50).all()
+    )
     return templates.TemplateResponse(
         request,
         "admin.html",
@@ -254,6 +288,7 @@ def admin_page(
             "names": name_map(db, visits),
             "stats": stats,
             "terceros": terceros,
+            "paquetes_hist": paquetes_hist,
             "f_date": date or "",
             "f_tower": tower or "",
             "f_status": status or "",

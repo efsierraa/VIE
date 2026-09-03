@@ -121,6 +121,30 @@
   {% endif %}
   </div>
 </section>
+
+<h1>Paquetes entregados hoy</h1>
+<section class="card">
+  <div class="table-wrap">
+  {% if paquetes_hoy %}
+  <table>
+    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Hora</th><th>Entregó</th></tr></thead>
+    <tbody>
+    {% for item in paquetes_hoy %}
+    <tr>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% else %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td>{{ item.p.delivered_at|dt }}</td>
+      <td>{{ item.entrego }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin paquetes entregados hoy.</p>
+  {% endif %}
+  </div>
+</section>
 {% endblock %}
 
 {% block scripts %}

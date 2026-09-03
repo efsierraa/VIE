@@ -148,6 +148,33 @@
   {% endif %}
   </div>
 </section>
+
+<h1>Historial de paquetes</h1>
+<section class="card">
+  <p class="hint">Trazabilidad para cotejar reclamaciones: cuándo llegó, a quién se entregó, quién entregó y si el residente lo confirmó. Exportación completa por fechas en el botón "Exportar Excel" (hoja Paquetes).</p>
+  <div class="table-wrap">
+  {% if paquetes_hist %}
+  <table>
+    <thead><tr><th>Paquete</th><th>Entregado a</th><th>Estado</th><th>Recibido</th><th>Entregado</th><th>Confirmado</th><th>Entregó</th></tr></thead>
+    <tbody>
+    {% for item in paquetes_hist %}
+    <tr>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% else %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td>{{ item.p.created_at|dt }}</td>
+      <td>{{ item.p.delivered_at|dt }}</td>
+      <td>{{ item.p.confirmed_at|dt }}</td>
+      <td>{{ item.entrego }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin paquetes registrados.</p>
+  {% endif %}
+  </div>
+</section>
 {% endblock %}
 
 {% block scripts %}

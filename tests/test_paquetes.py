@@ -210,19 +210,6 @@ def test_camara_qr_basura(client):
     assert "inválido" in r.json()["detail"]
 
 
-def test_export_incluye_hoja_paquetes(client):
-    import openpyxl
-
-    login(client, "guarda1")
-    _registrar_paquete(client)
-    login(client, "admin1")
-    r = client.get("/admin/exportar")
-    assert r.status_code == 200
-    wb = openpyxl.load_workbook(BytesIO(r.content))
-    assert "Paquetes" in wb.sheetnames
-    assert "Ingresos" in wb.sheetnames
-
-
 def test_paquete_tercero_flujo(client):
     login(client, "guarda1")
     r = client.post(
@@ -343,6 +330,30 @@ def test_limpieza_foto_tercero_deja_evidencia_de_cedula(client):
     assert p.photo is None
     assert p.cedula_tercero == "556677"  # la cédula queda en el registro como evidencia
     db.close()
+
+
+def test_registro_de_entregas_visible_para_cotejo(client):
+    # entrega de un paquete tercero: la reclamación se coteja contra este registro
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombre": "Cotejo Vecino", "description": "caja frágil", "photo_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+    client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "777888"})
+
+    # el guarda lo ve en su registro del día, con destinatario y cédula
+    page = client.get("/guarda")
+    assert "Cotejo Vecino" in page.text
+    assert "777888" in page.text
+
+    # administración ve la trazabilidad completa: estado, quién entregó y cuándo
+    login(client, "admin1")
+    page = client.get("/admin")
+    assert "Cotejo Vecino" in page.text
+    assert "777888" in page.text
+    assert "entregado" in page.text
+    assert "Historial de paquetes" in page.text
 
 
 def test_export_incluye_hoja_paquetes(client):
