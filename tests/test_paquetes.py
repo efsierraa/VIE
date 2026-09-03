@@ -167,6 +167,49 @@ def test_busqueda_de_residentes(client):
     assert len(buscar("residente1")) == 1
 
 
+def test_camara_unificada_reconoce_ambos_qr(client):
+    from app.security import sign_package
+
+    # la cámara manda el token a /api/scan/qr: visita → procesa; paquete → muestra para entregar
+    login(client, "residente1")
+    r = client.post(
+        "/api/visits",
+        json={"visitor_name": "Visita Cámara", "subject": "x", "visitor_role": "visitante", "hours": 4},
+    )
+    token_visita = r.json()["token"]
+
+    login(client, "guarda1")
+    pkg = _registrar_paquete(client)
+    token_paquete = sign_package(pkg["uuid"])
+
+    # QR de visita
+    r = client.post("/api/scan/qr", json={"token": token_visita, "action": "entrada"})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["tipo"] == "visita"
+    assert j["visit"]["status"] == "dentro"
+
+    # QR de paquete: muestra la foto sin marcar nada
+    r = client.post("/api/scan/qr", json={"token": token_paquete, "action": "entrada"})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["tipo"] == "paquete"
+    assert j["package"]["photo_data_uri"].startswith("data:image/")
+    assert j["package"]["status"] == "en_porteria"
+
+    # entregado → su QR ya no sirve en la cámara
+    client.post(f"/api/packages/{pkg['uuid']}/entregar")
+    r = client.post("/api/scan/qr", json={"token": token_paquete, "action": "entrada"})
+    assert r.status_code == 400
+
+
+def test_camara_qr_basura(client):
+    login(client, "guarda1")
+    r = client.post("/api/scan/qr", json={"token": "garbage", "action": "entrada"})
+    assert r.status_code == 400
+    assert "inválido" in r.json()["detail"]
+
+
 def test_export_incluye_hoja_paquetes(client):
     import openpyxl
 

@@ -276,11 +276,16 @@ def scan(
         if visit is None:
             raise HTTPException(400, "QR inválido o alterado")
 
+    return _procesar_visita(db, guard, visit, data.action)
+
+
+def _procesar_visita(db: Session, guard: User, visit: Visit, action: str) -> dict:
+    """Transiciones de estado de la visita: entrada y salida opcional."""
     now = utcnow()
     if visit.status == "pendiente":
         if now > visit.expires_at:
             raise HTTPException(400, "QR expirado")
-        if data.action != "entrada":
+        if action != "entrada":
             raise HTTPException(400, "El visitante aún no ha ingresado")
         visit.status = "dentro"
         visit.entry_at = now
@@ -289,7 +294,7 @@ def scan(
         return {"ok": True, "message": "Entrada registrada", "visit": visit_dict(visit)}
 
     if visit.status == "dentro":
-        if data.action != "salida":
+        if action != "salida":
             raise HTTPException(400, "El visitante ya ingresó; usa el modo salida")
         visit.status = "finalizada"
         visit.exit_at = now
@@ -301,6 +306,49 @@ def scan(
     if visit.status == "finalizada":
         raise HTTPException(400, "Visita ya finalizada")
     raise HTTPException(400, "Visita cancelada")
+
+
+@router.post("/scan/qr")
+def escanear_qr(
+    request: Request,
+    data: ScanIn,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    """Un solo punto para la cámara: resuelve por la firma si el QR es de visita o de paquete."""
+    verificar_limite(request, "scan", 120, 600)
+    registrar_intento(request, "scan")
+    if not data.token:
+        raise HTTPException(400, "Falta el QR")
+
+    visit_uuid = verify_token(data.token)
+    if visit_uuid is not None:
+        visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+        if visit is not None:
+            if data.action not in ("entrada", "salida"):
+                raise HTTPException(400, "Acción no válida")
+            return {**_procesar_visita(db, guard, visit, data.action), "tipo": "visita"}
+
+    pkg_uuid = verify_package_token(data.token)
+    if pkg_uuid is not None:
+        pkg = db.query(Package).filter(Package.uuid == pkg_uuid).first()
+        if pkg is None:
+            raise HTTPException(400, "QR inválido o alterado")
+        if pkg.status != "en_porteria":
+            raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+        residente = db.get(User, pkg.resident_id)
+        return {
+            "tipo": "paquete",
+            "ok": True,
+            "package": package_dict(pkg, include_photo=True),
+            "residente": {
+                "nombre": residente.nombre_completo,
+                "tower": residente.tower,
+                "apartment": residente.apartment,
+            },
+        }
+
+    raise HTTPException(400, "QR inválido o alterado")
 
 
 @router.post("/visits/manual")

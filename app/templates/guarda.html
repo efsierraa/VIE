@@ -11,6 +11,7 @@
   <div class="row">
     <button id="btn-cam" type="button">Iniciar cámara</button>
   </div>
+  <p class="hint">La cámara reconoce el QR de visitas (entrada/salida) y también el QR de paquetes para entregarlos.</p>
   <p class="hint">Si la cámara no está disponible, digita el código corto del pase o pega el código largo:</p>
   <form id="token-form" class="form inline">
     <input id="token-input" placeholder="Ej: K7M2PA o pega el pase completo" required autocomplete="off">
@@ -67,7 +68,7 @@
 
 <section class="card">
   <h2>Entregar paquete</h2>
-  <p class="hint">Digita el código que muestra el residente (o escanea el QR del paquete con la cámara de arriba):</p>
+  <p class="hint">Digita el código que muestra el residente (la cámara de arriba también lee el QR del paquete):</p>
   <form id="pkg-scan-form" class="form inline">
     <input id="pkg-code" placeholder="Ej: K7M2PA" autocomplete="off">
     <button type="submit">Buscar</button>

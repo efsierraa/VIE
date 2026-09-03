@@ -32,6 +32,45 @@ async function submitScan(payload) {
   }
 }
 
+// La cámara no sabe si el QR es de visita o de paquete: lo resuelve el servidor por la firma
+async function enviarCamara(token) {
+  const r = await fetch("/api/scan/qr", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token, action: mode})});
+  const j = await r.json();
+  if (!r.ok || !j.ok) {
+    show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
+    return;
+  }
+  if (j.tipo === "paquete") {
+    renderPaquete(j, resultBody);
+    resultCard.classList.remove("hidden");
+  } else {
+    const v = j.visit;
+    show('<p class="alert ok">' + esc(j.message) + '</p>' +
+      '<p><strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')<br>' +
+      esc(v.subject) + '<br>Torre ' + esc(v.tower) + ' · Apto ' + esc(v.apartment) +
+      (v.id_number ? '<br>ID: ' + esc(v.id_number) : '') + '</p>');
+    setTimeout(() => location.reload(), 2500);
+  }
+}
+
+function renderPaquete(j, box) {
+  box.innerHTML =
+    '<img src="' + j.package.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
+    '<p><strong>' + esc(j.residente.nombre) + '</strong> · Torre ' + esc(j.residente.tower) + ' · ' + esc(j.residente.apartment) +
+    (j.package.description ? '<br>' + esc(j.package.description) : '') + '</p>' +
+    '<button id="btn-entregar" type="button">Marcar entregado</button>';
+  document.getElementById("btn-entregar").addEventListener("click", async () => {
+    const r2 = await fetch("/api/packages/" + j.package.uuid + "/entregar", {method: "POST"});
+    const j2 = await r2.json();
+    if (r2.ok && j2.ok) {
+      box.innerHTML = '<p class="alert ok">Paquete entregado. El residente debe confirmar en su app.</p>';
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      box.innerHTML = '<p class="alert error">' + esc(j2.detail || "Error") + '</p>';
+    }
+  });
+}
+
 document.getElementById("token-form").addEventListener("submit", e => {
   e.preventDefault();
   const raw = document.getElementById("token-input").value.trim();
@@ -48,7 +87,7 @@ document.getElementById("btn-cam").addEventListener("click", async () => {
     scanner = new Html5Qrcode("reader");
     await scanner.start({facingMode: "environment"}, {fps: 10, qrbox: 250}, text => {
       scanner.pause(true);
-      submitScan({token: text.trim()});
+      enviarCamara(text.trim());
       setTimeout(() => scanner.resume(), 2500);
     });
     document.getElementById("btn-cam").disabled = true;
@@ -170,19 +209,5 @@ document.getElementById("pkg-scan-form").addEventListener("submit", async e => {
   const r = await fetch("/api/packages/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code})});
   const j = await r.json();
   if (!r.ok || !j.ok) { box.innerHTML = '<p class="alert error">' + esc(j.detail || "Error") + '</p>'; return; }
-  box.innerHTML =
-    '<img src="' + j.package.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
-    '<p><strong>' + esc(j.residente.nombre) + '</strong> · Torre ' + esc(j.residente.tower) + ' · ' + esc(j.residente.apartment) +
-    (j.package.description ? '<br>' + esc(j.package.description) : '') + '</p>' +
-    '<button id="btn-entregar" type="button">Marcar entregado</button>';
-  document.getElementById("btn-entregar").addEventListener("click", async () => {
-    const r2 = await fetch("/api/packages/" + j.package.uuid + "/entregar", {method: "POST"});
-    const j2 = await r2.json();
-    if (r2.ok && j2.ok) {
-      box.innerHTML = '<p class="alert ok">Paquete entregado. El residente debe confirmar en su app.</p>';
-      setTimeout(() => location.reload(), 2500);
-    } else {
-      box.innerHTML = '<p class="alert error">' + esc(j2.detail || "Error") + '</p>';
-    }
-  });
+  renderPaquete(j, box);
 });
