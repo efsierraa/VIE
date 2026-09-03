@@ -347,6 +347,15 @@ def test_registro_de_entregas_visible_para_cotejo(client):
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
     assert "caja frágil" in page.text  # la descripción también sirve para cotejar
+    assert "Ver imagen" in page.text  # la foto sigue vigente (30 días)
+
+    # la foto se sirve por su endpoint, solo para guarda y admin
+    foto = client.get(f"/api/packages/{pkg['uuid']}/foto")
+    assert foto.status_code == 200
+    assert foto.headers["content-type"].startswith("image/jpeg")
+    assert foto.content[:2] == b"\xff\xd8"
+    login(client, "residente1")
+    assert client.get(f"/api/packages/{pkg['uuid']}/foto").status_code == 403
 
     # administración ve la trazabilidad completa: estado, quién entregó y cuándo
     login(client, "admin1")
@@ -355,7 +364,40 @@ def test_registro_de_entregas_visible_para_cotejo(client):
     assert "777888" in page.text
     assert "caja frágil" in page.text
     assert "entregado" in page.text
+    assert "Ver imagen" in page.text
     assert "Historial de paquetes" in page.text
+    assert client.get(f"/api/packages/{pkg['uuid']}/foto").status_code == 200
+
+
+def test_foto_borrada_tras_plazo_muestra_mensaje(client):
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombre": "Foto Vencida", "photo_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+    client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "112233"})
+
+    # forzar el vencimiento y pasar la limpieza
+    db = SessionLocal()
+    p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
+    p.photo_delete_after = utcnow() - timedelta(minutes=1)
+    db.commit()
+    db.close()
+    db = SessionLocal()
+    limpiar_fotos_vencidas(db)
+    db.close()
+
+    # el endpoint avisa en lugar de servir la imagen
+    r = client.get(f"/api/packages/{pkg['uuid']}/foto")
+    assert r.status_code == 404
+    assert "no disponible" in r.text
+    assert "30 días" in r.text
+
+    # y la tabla muestra el aviso en vez del enlace
+    page = client.get("/guarda")
+    assert "Imagen borrada" in page.text
+    assert "Ver imagen" not in page.text.split("Foto Vencida")[1].split("</tr>")[0]
 
 
 def test_export_incluye_hoja_paquetes(client):

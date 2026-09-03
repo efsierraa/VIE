@@ -110,7 +110,8 @@ button, .button {
 }
 button:hover, .button:hover { background: var(--verde-oscuro); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
-button.small {
+button.small,
+a.small {
   padding: 0.1rem 0.15rem;
   margin-right: 0.5rem;
   font-size: 0.85rem;
@@ -118,7 +119,8 @@ button.small {
   color: var(--verde-oscuro);
   text-decoration: underline;
 }
-button.small:hover { background: none; color: var(--verde); }
+button.small:hover,
+a.small:hover { background: none; color: var(--verde); }
 button.small.danger { color: var(--error); }
 button.small.danger:hover { background: none; color: #a91e1e; }
 

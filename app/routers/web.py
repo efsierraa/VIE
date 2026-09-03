@@ -65,6 +65,7 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
             {
                 "p": p,
                 "descripcion": p.description or "",
+                "foto_disponible": p.photo is not None,
                 "destinatario": p.nombre_tercero or (residente.nombre_completo if residente else "—"),
                 "cedula": (p.cedula_tercero or "") if p.tercero else "",
                 "destino": "" if p.tercero or not residente else f"T{residente.tower} · {residente.apartment}",

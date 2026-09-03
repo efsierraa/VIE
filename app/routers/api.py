@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -595,6 +596,32 @@ def limpiar_fotos_vencidas(db: Session) -> int:
     if vencidos:
         db.commit()
     return len(vencidos)
+
+
+@router.get("/packages/{package_uuid}/foto")
+def foto_paquete(
+    package_uuid: str,
+    user: User = Depends(require_api("guarda", "admin")),
+    db: Session = Depends(get_db),
+):
+    """La foto del paquete para cotejo. Se borra 30 días después de la entrega."""
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if not pkg.photo:
+        return HTMLResponse(
+            content=(
+                "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+                "<title>VIE — Imagen no disponible</title>"
+                "<link rel='stylesheet' href='/static/style.css'></head>"
+                "<body><main class='card narrow center'><h1>Imagen no disponible</h1>"
+                "<p>La foto se borra 30 días después de la entrega para liberar espacio. "
+                "El registro de la entrega permanece en el historial.</p>"
+                "<p><a href='/'>Volver</a></p></main></body>"
+            ),
+            status_code=404,
+        )
+    return Response(content=pkg.photo, media_type=pkg.photo_mime or "image/jpeg")
 
 
 # Torre y apto juntos: "T4 1005", "4 1005", "4-1005", "t4.1005". El apto siempre lleva dígitos.
