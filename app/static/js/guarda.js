@@ -96,7 +96,10 @@ function comprimirFoto(file) {
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("El navegador no pudo leer la foto. Si tu cámara guarda en HEIC, elige la opción Cámara y configura formato JPEG, o selecciona una foto de la galería."));
+    };
     img.src = url;
   });
 }

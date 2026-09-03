@@ -53,7 +53,7 @@ async def cabeceras_seguridad(request: Request, call_next):
     h.setdefault("Permissions-Policy", "camera=(self), geolocation=(), payment=()")
     h.setdefault(
         "Content-Security-Policy",
-        "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+        "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; "
         "script-src 'self' https://cdn.jsdelivr.net; connect-src 'self'; "
         "font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
         "frame-ancestors 'none'",

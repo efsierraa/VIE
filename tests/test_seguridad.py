@@ -14,7 +14,7 @@ def test_cabeceras_de_seguridad(client):
     assert r.headers["referrer-policy"] == "same-origin"
     csp = r.headers["content-security-policy"]
     assert "frame-ancestors 'none'" in csp
-    assert "img-src 'self' data:" in csp
+    assert "img-src 'self' data: blob:" in csp
     assert "default-src 'self'" in csp
 
 
