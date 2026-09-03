@@ -11,6 +11,14 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
 3. **Administración**: dashboard con métricas del día, crea las cuentas (una a una o **importando un CSV**), asigna claves y **exporta el historial a Excel** por rango de fechas.
 
+### Paquetes
+
+1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente.
+2. El residente ve el aviso en su app: foto, descripción, código corto y **QR para reclamarlo**.
+3. En portería el residente muestra el QR → el guarda **ve la foto** → busca el paquete → **"Marcar entregado"**.
+4. El residente **confirma la recepción** (o marca "No lo recibí" → queda en disputa para administración).
+5. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
+
 Si la app falla, el guarda registra a mano (entrada manual) o se vuelve al método de siempre: llamar y anotar.
 
 ## Stack

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import csv
 import io
 import secrets
@@ -8,12 +9,21 @@ from uuid import uuid4
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, require_api, verify_password
 from app.database import get_db
-from app.models import ROLES, VALID_HOURS, VISITOR_ROLES, User, Visit
-from app.security import sign_visit, verify_token
+from app.models import (
+    DIAS_FOTO_ENTREGADA,
+    ROLES,
+    VALID_HOURS,
+    VISITOR_ROLES,
+    Package,
+    User,
+    Visit,
+)
+from app.security import sign_package, sign_visit, verify_package_token, verify_token
 from app.utils import format_duration, utcnow
 
 router = APIRouter(prefix="/api")
@@ -22,12 +32,16 @@ router = APIRouter(prefix="/api")
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 
-def new_short_code(db: Session) -> str:
-    """Código corto de 6 caracteres, único, para digitar en portería."""
+def _codigo_unico(db: Session, modelo) -> str:
     while True:
         code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
-        if not db.query(Visit).filter(Visit.short_code == code).first():
+        if not db.query(modelo).filter(modelo.short_code == code).first():
             return code
+
+
+def new_short_code(db: Session) -> str:
+    """Código corto de 6 caracteres, único, para digitar en portería."""
+    return _codigo_unico(db, Visit)
 
 
 def qr_data_uri(text: str) -> str:
@@ -418,6 +432,289 @@ def change_my_password(
     user.password_hash = hash_password(data.nueva)
     db.commit()
     return {"ok": True}
+
+
+# --- Paquetes ---------------------------------------------------------------
+
+FOTO_MAX_BYTES = 2_000_000
+FOTO_MIMES = ("image/jpeg", "image/png", "image/webp")
+
+
+class PackageIn(BaseModel):
+    resident_id: int
+    description: str | None = None
+    photo_b64: str  # data URI: data:image/jpeg;base64,xxx
+
+
+class PackageScanIn(BaseModel):
+    token: str | None = None  # QR del paquete (firmado con sal propia)
+    code: str | None = None  # código corto digitado
+
+
+def decodificar_foto(data_uri: str) -> tuple[bytes, str]:
+    """Acepta data URI y devuelve (bytes, mime). Cap de tamaño y mimetypes permitidos."""
+    try:
+        encabezado, b64 = data_uri.split(",", 1)
+    except ValueError:
+        raise ValueError("Formato de foto no válido")
+    mime = encabezado[5:encabezado.find(";")] if encabezado.startswith("data:") and ";" in encabezado else "image/jpeg"
+    if mime not in FOTO_MIMES:
+        raise ValueError("Tipo de imagen no permitido")
+    try:
+        foto = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("Foto corrupta")
+    if len(foto) > FOTO_MAX_BYTES:
+        raise ValueError("Foto demasiado grande")
+    if not foto:
+        raise ValueError("Foto vacía")
+    return foto, mime
+
+
+def package_dict(p: Package, include_photo: bool = False) -> dict:
+    d = {
+        "id": p.id,
+        "uuid": p.uuid,
+        "short_code": p.short_code,
+        "description": p.description,
+        "status": p.status,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "delivered_at": p.delivered_at.isoformat() if p.delivered_at else None,
+        "confirmed_at": p.confirmed_at.isoformat() if p.confirmed_at else None,
+        "photo_delete_after": p.photo_delete_after.isoformat() if p.photo_delete_after else None,
+    }
+    if include_photo and p.photo:
+        d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
+    return d
+
+
+def limpiar_fotos_vencidas(db: Session) -> int:
+    """Borra las fotos cuyo plazo (30 días tras entrega) venció; el registro queda sin foto."""
+    vencidos = (
+        db.query(Package)
+        .filter(
+            Package.photo_delete_after.isnot(None),
+            Package.photo_delete_after < utcnow(),
+            Package.photo.isnot(None),
+        )
+        .all()
+    )
+    for p in vencidos:
+        p.photo = None
+        p.photo_mime = None
+    if vencidos:
+        db.commit()
+    return len(vencidos)
+
+
+@router.get("/residentes")
+def buscar_residentes(
+    q: str = "",
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    query = db.query(User).filter(User.role == "residente", User.active.is_(True))
+    if q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                User.username.ilike(like),
+                User.nombres.ilike(like),
+                User.apellidos.ilike(like),
+                User.tower.ilike(like),
+                User.apartment.ilike(like),
+            )
+        )
+    users = query.order_by(User.tower, User.apartment, User.username).limit(10).all()
+    return {
+        "ok": True,
+        "residentes": [
+            {
+                "id": u.id,
+                "nombre": u.nombre_completo,
+                "username": u.username,
+                "tower": u.tower,
+                "apartment": u.apartment,
+            }
+            for u in users
+        ],
+    }
+
+
+@router.post("/packages")
+def registrar_paquete(
+    data: PackageIn,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    residente = db.get(User, data.resident_id)
+    if residente is None or residente.role != "residente" or not residente.active:
+        raise HTTPException(400, "Residente no válido")
+    description = (data.description or "").strip() or None
+    if description and len(description) > 200:
+        raise HTTPException(400, "La descripción es demasiado larga")
+    try:
+        foto, mime = decodificar_foto(data.photo_b64)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    pkg = Package(
+        uuid=str(uuid4()),
+        short_code=_codigo_unico(db, Package),
+        resident_id=residente.id,
+        description=description,
+        photo=foto,
+        photo_mime=mime,
+    )
+    db.add(pkg)
+    db.commit()
+    db.refresh(pkg)
+    return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.post("/packages/scan")
+def escanear_paquete(
+    data: PackageScanIn,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    """Muestra el paquete con su foto; no marca nada hasta que el guarda confirme la entrega."""
+    if data.code:
+        pkg = db.query(Package).filter(Package.short_code == data.code.strip().upper()).first()
+        if pkg is None:
+            raise HTTPException(400, "Código de paquete no válido")
+    else:
+        if not data.token:
+            raise HTTPException(400, "Falta el código o el QR del paquete")
+        pkg_uuid = verify_package_token(data.token)
+        if pkg_uuid is None:
+            raise HTTPException(400, "QR de paquete inválido o alterado")
+        pkg = db.query(Package).filter(Package.uuid == pkg_uuid).first()
+        if pkg is None:
+            raise HTTPException(400, "QR de paquete inválido o alterado")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    residente = db.get(User, pkg.resident_id)
+    return {
+        "ok": True,
+        "package": package_dict(pkg, include_photo=True),
+        "residente": {
+            "nombre": residente.nombre_completo,
+            "tower": residente.tower,
+            "apartment": residente.apartment,
+        },
+    }
+
+
+@router.post("/packages/{package_uuid}/entregar")
+def entregar_paquete(
+    package_uuid: str,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    pkg.status = "entregado"
+    pkg.delivered_at = utcnow()
+    pkg.delivered_by = guard.id
+    pkg.photo_delete_after = utcnow() + timedelta(days=DIAS_FOTO_ENTREGADA)
+    db.commit()
+    return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.post("/packages/{package_uuid}/cancelar")
+def cancelar_paquete(
+    package_uuid: str,
+    guard: User = Depends(require_api("guarda")),
+    db: Session = Depends(get_db),
+):
+    """Registro erróneo: cancela y borra la foto de inmediato."""
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "Solo se puede cancelar un paquete en portería")
+    pkg.status = "cancelado"
+    pkg.photo = None
+    pkg.photo_mime = None
+    db.commit()
+    return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.get("/packages/mine")
+def mis_paquetes(user: User = Depends(require_api("residente")), db: Session = Depends(get_db)):
+    pkgs = (
+        db.query(Package)
+        .filter(Package.resident_id == user.id)
+        .order_by(Package.id.desc())
+        .limit(20)
+        .all()
+    )
+    out = []
+    for p in pkgs:
+        d = package_dict(p)
+        if p.status == "en_porteria":
+            if p.photo:
+                d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
+            d["qr_data_uri"] = qr_data_uri(sign_package(p.uuid))
+        out.append(d)
+    pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
+    return {"ok": True, "pendientes": pendientes, "packages": out}
+
+
+@router.get("/packages/{package_uuid}/pass")
+def paquete_pass(
+    package_uuid: str,
+    user: User = Depends(require_api("residente")),
+    db: Session = Depends(get_db),
+):
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None or pkg.resident_id != user.id:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    return {
+        "ok": True,
+        "token": sign_package(pkg.uuid),
+        "qr_data_uri": qr_data_uri(sign_package(pkg.uuid)),
+        "package": package_dict(pkg, include_photo=True),
+    }
+
+
+@router.post("/packages/{package_uuid}/confirmar")
+def confirmar_paquete(
+    package_uuid: str,
+    user: User = Depends(require_api("residente")),
+    db: Session = Depends(get_db),
+):
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None or pkg.resident_id != user.id:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "entregado":
+        raise HTTPException(400, "Solo se puede confirmar un paquete entregado")
+    pkg.status = "confirmado"
+    pkg.confirmed_at = utcnow()
+    db.commit()
+    return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.post("/packages/{package_uuid}/disputar")
+def disputar_paquete(
+    package_uuid: str,
+    user: User = Depends(require_api("residente")),
+    db: Session = Depends(get_db),
+):
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None or pkg.resident_id != user.id:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "entregado":
+        raise HTTPException(400, "Solo se puede disputar un paquete entregado")
+    pkg.status = "disputa"
+    db.commit()
+    return {"ok": True, "package": package_dict(pkg)}
 
 
 @router.post("/users/{user_id}/toggle")

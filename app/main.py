@@ -9,7 +9,6 @@ from app.database import Base, SessionLocal, engine
 from app.models import User
 from app.routers import api, web
 
-
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
     Base.metadata.create_all(engine)
@@ -31,6 +30,8 @@ def _ensure_schema():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ensure_schema()
+    with SessionLocal() as db:
+        api.limpiar_fotos_vencidas(db)
     yield
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String
 
 from app.database import Base
 from app.utils import utcnow
@@ -7,6 +7,8 @@ ROLES = ("admin", "guarda", "residente")
 VISITOR_ROLES = ("visitante", "domiciliario")
 VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24)
+PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
+DIAS_FOTO_ENTREGADA = 30
 
 
 class User(Base):
@@ -52,3 +54,21 @@ class Visit(Base):
     exit_at = Column(DateTime)
     entry_guard_id = Column(Integer, ForeignKey("users.id"))
     exit_guard_id = Column(Integer, ForeignKey("users.id"))
+
+
+class Package(Base):
+    __tablename__ = "packages"
+
+    id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True)
+    short_code = Column(String(8), unique=True, index=True)
+    resident_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    description = Column(String(200))
+    photo = Column(LargeBinary)
+    photo_mime = Column(String(40))
+    status = Column(String(20), default="en_porteria", nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    delivered_at = Column(DateTime)
+    delivered_by = Column(Integer, ForeignKey("users.id"))
+    confirmed_at = Column(DateTime)
+    photo_delete_after = Column(DateTime)  # la foto se borra sola 30 días tras la entrega

@@ -1,4 +1,6 @@
 import io
+import base64
+import io
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -18,7 +20,9 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
-from app.models import Visit, User
+from app.models import Package, Visit, User
+from app.routers.api import qr_data_uri
+from app.security import sign_package
 from app.utils import format_duration, utcnow
 
 router = APIRouter()
@@ -120,8 +124,32 @@ def residente_page(
         .limit(20)
         .all()
     )
+    pkgs = (
+        db.query(Package)
+        .filter(Package.resident_id == user.id)
+        .order_by(Package.id.desc())
+        .limit(10)
+        .all()
+    )
+    paquetes = []
+    for p in pkgs:
+        en_porteria = p.status == "en_porteria"
+        paquetes.append(
+            {
+                "p": p,
+                "photo": (
+                    f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
+                    if en_porteria and p.photo
+                    else None
+                ),
+                "qr": qr_data_uri(sign_package(p.uuid)) if en_porteria else None,
+            }
+        )
+    pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
     return templates.TemplateResponse(
-        request, "residente.html", {"user": user, "visits": visits}
+        request,
+        "residente.html",
+        {"user": user, "visits": visits, "paquetes": paquetes, "pendientes": pendientes},
     )
 
 
@@ -197,6 +225,7 @@ def admin_page(
         "hoy": db.query(Visit).filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc).count(),
         "dentro": db.query(Visit).filter(Visit.status == "dentro").count(),
         "pendientes": db.query(Visit).filter(Visit.status == "pendiente").count(),
+        "paquetes": db.query(Package).filter(Package.status == "en_porteria").count(),
         "activos": db.query(User).filter(User.active.is_(True)).count(),
     }
     return templates.TemplateResponse(
@@ -243,6 +272,16 @@ def exportar_visitas(
     )
     names = name_map(db, visits)
 
+    # Paquetes creados en el mismo rango
+    pkgs = (
+        db.query(Package)
+        .filter(Package.created_at >= start_utc, Package.created_at <= end_utc)
+        .order_by(Package.created_at)
+        .all()
+    )
+    ids_pkg = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
+    usuarios_pkg = {u.id: u for u in db.query(User).filter(User.id.in_(ids_pkg)).all()} if ids_pkg else {}
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Ingresos"
@@ -276,9 +315,38 @@ def exportar_visitas(
             ]
         )
     buf = io.BytesIO()
+    _hoja_paquetes(wb, pkgs, usuarios_pkg)
     wb.save(buf)
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="vie_ingresos_{d1.isoformat()}_{d2.isoformat()}.xlsx"'},
     )
+
+
+def _hoja_paquetes(wb, pkgs, usuarios):
+    ws = wb.create_sheet("Paquetes")
+    ws.append(
+        [
+            "Fecha registro", "Residente", "Torre", "Apartamento", "Descripción",
+            "Estado", "Entregado", "Confirmado", "Entregó",
+        ]
+    )
+    for p in pkgs:
+        residente = usuarios.get(p.resident_id)
+        creado = p.created_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.created_at else None
+        entregado = p.delivered_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.delivered_at else None
+        confirmado = p.confirmed_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.confirmed_at else None
+        ws.append(
+            [
+                creado.strftime("%d/%m/%Y %H:%M") if creado else "",
+                residente.nombre_completo if residente else "",
+                residente.tower if residente else "",
+                residente.apartment if residente else "",
+                p.description or "",
+                p.status,
+                entregado.strftime("%d/%m/%Y %H:%M") if entregado else "",
+                confirmado.strftime("%d/%m/%Y %H:%M") if confirmado else "",
+                usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
+            ]
+        )

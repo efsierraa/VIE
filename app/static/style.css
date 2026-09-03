@@ -134,6 +134,10 @@ button.danger:hover { background: #a91e1e; }
 .chip.status-dentro { background: var(--info-suave); color: #1565c0; }
 .chip.status-finalizada { background: #eceff1; color: #546e7a; }
 .chip.status-cancelada { background: var(--error-suave); color: var(--error); }
+.chip.status-en_porteria { background: var(--alerta-suave); color: #8d6e00; }
+.chip.status-entregado { background: var(--info-suave); color: #1565c0; }
+.chip.status-confirmado { background: var(--ok-suave); color: var(--ok); }
+.chip.status-disputa { background: #fce4ec; color: #ad1457; }
 .chip.manual { background: var(--alerta-suave); color: #8d6e00; }
 
 /* Alertas */
@@ -209,8 +213,44 @@ td small { color: var(--gris-texto); }
   letter-spacing: 0.04em;
 }
 @media (min-width: 560px) {
-  .stats { grid-template-columns: repeat(4, 1fr); }
+  .stats { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* Paquetes */
+.pkg-card {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eef1f0;
+}
+.pkg-card:last-of-type { border-bottom: none; }
+.pkg-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--gris-borde);
+  flex-shrink: 0;
+}
+.pkg-info { flex: 1; display: flex; flex-direction: column; font-size: 0.9rem; min-width: 0; }
+.pkg-info small { color: var(--gris-texto); }
+.pkg-qr {
+  display: block;
+  width: 200px;
+  margin: 0.5rem auto;
+}
+.pkg-preview {
+  max-width: 220px;
+  width: 100%;
+  margin: 0.4rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--gris-borde);
+}
+.pkg-resultados { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.5rem; }
+.pkg-resultados:empty { display: none; }
+.pkg-resultados button { text-align: left; background: #eceff1; color: #37474f; font-size: 0.9rem; }
+.pkg-resultados button:hover { background: #cfd8dc; }
 .mode-row .mode { flex: 1; background: #eceff1; color: #37474f; }
 .mode-row .mode.active { background: var(--verde); color: #fff; }
 
