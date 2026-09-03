@@ -28,8 +28,10 @@ def _ensure_schema():
                 u.apellidos = partes[1] if len(partes) > 1 else "-"
             db.commit()
     if "tercero" not in {c["name"] for c in insp.get_columns("packages")}:
+        # Postgres exige FALSE en un BOOLEAN; SQLite acepta 0
+        falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
         with engine.begin() as conn:
-            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero BOOLEAN DEFAULT 0 NOT NULL")
+            conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN tercero BOOLEAN DEFAULT {falso} NOT NULL")
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN nombre_tercero VARCHAR(120)")
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN cedula_tercero VARCHAR(30)")
             conn.exec_driver_sql(
