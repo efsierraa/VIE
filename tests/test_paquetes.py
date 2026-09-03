@@ -216,6 +216,8 @@ def test_paquete_tercero_flujo(client):
         "/api/packages/manual",
         json={
             "nombre": "Nuevo Vecino",
+            "tower": "4",
+            "apartment": "1005",
             "description": "paquete de fontanería",
             "photo_b64": FOTO,
         },
@@ -224,6 +226,7 @@ def test_paquete_tercero_flujo(client):
     pkg = r.json()["package"]
     assert pkg["tercero"] is True
     assert pkg["short_code"] is None  # sin QR: la cédula es la llave
+    assert pkg["tower"] == "4" and pkg["apartment"] == "1005"  # todo paquete tiene destino
     assert pkg["cedula_tercero"] is None  # la cédula se registra solo al reclamar
 
     # un residente NO lo ve en su app (los paquetes tercero no tienen dueño con cuenta)
@@ -256,7 +259,7 @@ def test_paquete_tercero_asignar_a_residente_nuevo(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Vecino Pendiente", "photo_b64": FOTO},
+        json={"nombre": "Vecino Pendiente", "tower": "5", "apartment": "501", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
 
@@ -275,6 +278,7 @@ def test_paquete_tercero_asignar_a_residente_nuevo(client):
     j = r.json()["package"]
     assert j["tercero"] is False
     assert j["short_code"]
+    assert j["tower"] == "6" and j["apartment"] == "601"  # el destino pasa al dueño real
 
     # el residente nuevo ya lo ve con QR en su app
     login(client, "vecinonuevo")
@@ -293,7 +297,7 @@ def test_asignar_paquete_tercero_ya_entregado(client):
     """El paquete se entregó a un no registrado; después admin registra al residente
     y vincula el registro con su dueño real (trazabilidad), sin generar QR."""
     login(client, "guarda1")
-    r = client.post("/api/packages/manual", json={"nombre": "Entregado a Otro", "photo_b64": FOTO})
+    r = client.post("/api/packages/manual", json={"nombre": "Entregado a Otro", "tower": "9", "apartment": "909", "photo_b64": FOTO})
     pkg = r.json()["package"]
     client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "44332211"})
 
@@ -322,7 +326,7 @@ def test_asignar_paquete_tercero_ya_entregado(client):
 
 def test_paquete_tercero_permisos(client):
     login(client, "residente1")
-    r = client.post("/api/packages/manual", json={"nombre": "x", "photo_b64": FOTO})
+    r = client.post("/api/packages/manual", json={"nombre": "x", "tower": "1", "apartment": "1", "photo_b64": FOTO})
     assert r.status_code == 403
     r = client.post("/api/packages/abc/asignar", json={"username": "residente1"})
     assert r.status_code == 403
@@ -333,17 +337,20 @@ def test_paquete_tercero_permisos(client):
 
 def test_paquete_tercero_validacion(client):
     login(client, "guarda1")
-    r = client.post("/api/packages/manual", json={"nombre": "", "photo_b64": FOTO})
+    # sin torre/apartamento no se registra: todo paquete tiene destino
+    r = client.post("/api/packages/manual", json={"nombre": "Alguien", "tower": "", "apartment": "", "photo_b64": FOTO})
     assert r.status_code == 400
-    r = client.post("/api/packages/manual", json={"nombre": "Alguien"})
-    assert r.status_code == 422  # falta la foto del paquete
+    assert "obligatorios" in r.json()["detail"]
+    # falta la foto
+    r = client.post("/api/packages/manual", json={"nombre": "Alguien", "tower": "4", "apartment": "1005"})
+    assert r.status_code == 422
 
 
 def test_limpieza_foto_tercero_deja_evidencia_de_cedula(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Evidencia Cedula", "photo_b64": FOTO},
+        json={"nombre": "Evidencia Cedula", "tower": "7", "apartment": "707", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
     client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "556677"})
@@ -362,22 +369,30 @@ def test_limpieza_foto_tercero_deja_evidencia_de_cedula(client):
     assert p.cedula_tercero == "556677"  # la cédula queda en el registro como evidencia
     db.close()
 
+    db = SessionLocal()
+    limpiar_fotos_vencidas(db)
+    p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
+    assert p.photo is None
+    assert p.cedula_tercero == "556677"  # la cédula queda en el registro como evidencia
+    db.close()
+
 
 def test_registro_de_entregas_visible_para_cotejo(client):
     # entrega de un paquete tercero: la reclamación se coteja contra este registro
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Cotejo Vecino", "description": "caja frágil", "photo_b64": FOTO},
+        json={"nombre": "Cotejo Vecino", "tower": "9", "apartment": "901", "description": "caja frágil", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
     client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "777888"})
 
-    # el guarda lo ve en el registro de paquetes, con destinatario y cédula
+    # el guarda lo ve en el registro de paquetes, con destinatario, cédula y destino
     page = client.get("/guarda/paquetes")
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
     assert "caja frágil" in page.text  # la descripción también sirve para cotejar
+    assert "T9 · 901" in page.text  # torre y apartamento aunque sea manual
     assert "Ver imagen" in page.text  # la foto sigue vigente (30 días)
 
     # la foto se sirve por su endpoint, solo para guarda y admin
@@ -394,6 +409,7 @@ def test_registro_de_entregas_visible_para_cotejo(client):
     assert "Cotejo Vecino" in page.text
     assert "777888" in page.text
     assert "caja frágil" in page.text
+    assert "T9 · 901" in page.text
     assert "entregado" in page.text
     assert "Ver imagen" in page.text
     assert client.get(f"/api/packages/{pkg['uuid']}/foto").status_code == 200
@@ -403,7 +419,7 @@ def test_foto_borrada_tras_plazo_muestra_mensaje(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Foto Vencida", "photo_b64": FOTO},
+        json={"nombre": "Foto Vencida", "tower": "3", "apartment": "303", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
     client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "112233"})
@@ -437,7 +453,7 @@ def test_export_incluye_hoja_paquetes(client):
     _registrar_paquete(client)
     client.post(
         "/api/packages/manual",
-        json={"nombre": "Tercero Excel", "photo_b64": FOTO},
+        json={"nombre": "Tercero Excel", "tower": "2", "apartment": "202", "photo_b64": FOTO},
     )
     login(client, "admin1")
     r = client.get("/admin/exportar?ingresos=1&paquetes=1")

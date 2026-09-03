@@ -81,16 +81,20 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
   const okBox = document.getElementById("pkg-registro-ok");
   if (pkgEsTercero.checked) {
     const nombre = document.getElementById("pkg-tercero-nombre").value.trim();
+    const torre = document.getElementById("pkg-tercero-torre").value.trim().toUpperCase();
+    const apto = document.getElementById("pkg-tercero-apto").value.trim();
     if (!nombre) { alert("Digita el nombre del destinatario (el de la etiqueta del paquete)"); return; }
+    if (!torre || !apto) { alert("Torre y apartamento son obligatorios: vienen en la etiqueta del paquete"); return; }
     if (!pkgFotoB64) { alert("Toma la foto del paquete"); return; }
     const r = await fetch("/api/packages/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
       nombre,
+      tower, apartment: apto,
       description: document.getElementById("pkg-desc").value,
       photo_b64: pkgFotoB64,
     })});
     const j = await r.json();
     if (r.ok && j.ok) {
-      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong>. Sin QR: al reclamar se coteja el nombre con la cédula. Administración recibió la alerta.</p>';
+      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong> · T' + esc(j.package.tower) + ' · ' + esc(j.package.apartment) + '. Sin QR: al reclamar se coteja el nombre con la cédula. Administración recibió la alerta.</p>';
       e.target.reset();
       pkgFotoB64 = null;
       pkgPreview.classList.add("hidden");

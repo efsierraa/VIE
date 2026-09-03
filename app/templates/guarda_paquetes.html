@@ -54,7 +54,11 @@
       <label>Nombre del destinatario (como aparece en el paquete)
         <input id="pkg-tercero-nombre" maxlength="120">
       </label>
-      <p class="hint">Llega por transportadora, así que no se pide cédula ahora. Al reclamar se coteja el nombre con la cédula y se registra el número.</p>
+      <div class="row">
+        <label>Torre <input id="pkg-tercero-torre" maxlength="10" required placeholder="Ej: 4"></label>
+        <label>Apartamento <input id="pkg-tercero-apto" maxlength="10" required placeholder="Ej: 1005"></label>
+      </div>
+      <p class="hint">Torre y apartamento son obligatorios: todo paquete tiene destino (viene en la etiqueta). Al reclamar se coteja el nombre con la cédula y se registra el número.</p>
     </div>
     <label>Descripción (opcional)
       <input id="pkg-desc" maxlength="200" placeholder="Ej: caja Amazon, farmacia">

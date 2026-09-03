@@ -567,6 +567,8 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
         "tercero": p.tercero,
         "nombre_tercero": p.nombre_tercero,
         "cedula_tercero": p.cedula_tercero,
+        "tower": p.tower,
+        "apartment": p.apartment,
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "delivered_at": p.delivered_at.isoformat() if p.delivered_at else None,
         "confirmed_at": p.confirmed_at.isoformat() if p.confirmed_at else None,
@@ -699,6 +701,8 @@ def registrar_paquete(
         description=description,
         photo=foto,
         photo_mime=mime,
+        tower=residente.tower,
+        apartment=residente.apartment,
     )
     db.add(pkg)
     db.commit()
@@ -747,6 +751,8 @@ def escanear_paquete(
 
 class PackageManualIn(BaseModel):
     nombre: str
+    tower: str
+    apartment: str
     description: str | None = None
     photo_b64: str
 
@@ -757,13 +763,20 @@ def registrar_paquete_tercero(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
-    """Paquete para alguien sin cuenta: llega por transportadora, solo se registra el
-    nombre del destinatario (el de la etiqueta). Al reclamar se coteja con su cédula."""
+    """Paquete para alguien sin cuenta: llega por transportadora. Se registra el nombre
+    del destinatario y su destino (torre y apartamento de la etiqueta — obligatorios).
+    Al reclamar se coteja el nombre con la cédula."""
     nombre = data.nombre.strip()
     if not nombre:
         raise HTTPException(400, "El nombre del destinatario es obligatorio")
     if len(nombre) > 120:
         raise HTTPException(400, "El nombre es demasiado largo")
+    tower = data.tower.strip().upper()
+    apartment = data.apartment.strip()
+    if not tower or not apartment:
+        raise HTTPException(400, "La torre y el apartamento del destinatario son obligatorios")
+    if len(tower) > 10 or len(apartment) > 10:
+        raise HTTPException(400, "Torre o apartamento demasiado largos")
     description = (data.description or "").strip() or None
     if description and len(description) > 200:
         raise HTTPException(400, "La descripción es demasiado larga")
@@ -780,6 +793,8 @@ def registrar_paquete_tercero(
         photo_mime=mime,
         tercero=True,
         nombre_tercero=nombre,
+        tower=tower,
+        apartment=apartment,
     )
     db.add(pkg)
     db.commit()
@@ -839,6 +854,8 @@ def asignar_paquete(
         raise HTTPException(400, "Residente no encontrado o no válido")
     pkg.resident_id = residente.id
     pkg.tercero = False
+    pkg.tower = residente.tower
+    pkg.apartment = residente.apartment
     if pkg.status == "en_porteria":
         pkg.short_code = _codigo_unico(db, Package)
     db.commit()

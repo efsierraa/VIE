@@ -27,7 +27,8 @@ def _ensure_schema():
                 u.nombres = partes[0] or u.username
                 u.apellidos = partes[1] if len(partes) > 1 else "-"
             db.commit()
-    if "tercero" not in {c["name"] for c in insp.get_columns("packages")}:
+    pkg_cols = {c["name"] for c in insp.get_columns("packages")}
+    if "tercero" not in pkg_cols:
         # Postgres exige FALSE en un BOOLEAN; SQLite acepta 0
         falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
         with engine.begin() as conn:
@@ -37,6 +38,11 @@ def _ensure_schema():
             conn.exec_driver_sql(
                 "CREATE INDEX IF NOT EXISTS ix_packages_cedula_tercero ON packages (cedula_tercero)"
             )
+    faltan_destino = {"tower", "apartment"} - pkg_cols
+    if faltan_destino:
+        with engine.begin() as conn:
+            for col in faltan_destino:
+                conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} VARCHAR(10)")
 
 
 @asynccontextmanager

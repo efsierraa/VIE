@@ -55,7 +55,7 @@ def _datos_de_prueba(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Paquete Filtrado", "description": "caja electronica", "photo_b64": FOTO},
+        json={"nombre": "Paquete Filtrado", "tower": "5", "apartment": "505", "description": "caja electronica", "photo_b64": FOTO},
     )
     assert r.status_code == 200
 

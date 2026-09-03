@@ -79,3 +79,8 @@ class Package(Base):
     tercero = Column(Boolean, default=False, nullable=False)
     nombre_tercero = Column(String(120))
     cedula_tercero = Column(String(30), index=True)  # cédula de quien reclamó, al entregar
+
+    # Todo paquete nace con destino asociado: se copia del perfil del residente
+    # o se digita de la etiqueta (terceros). Se actualiza al asignar un residente.
+    tower = Column(String(10))
+    apartment = Column(String(10))

@@ -31,7 +31,7 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 
 Cuando el paquete llega por transportadora para una persona sin cuenta (lo más probable: un residente nuevo), el guarda marca **"El destinatario NO está registrado"** al registrarlo:
 
-1. Digita el **nombre del destinatario** (el de la etiqueta del paquete) y toma la **foto del paquete**. No se pide cédula al registrar — quien trajo el paquete es la transportadora
+1. Digita el **nombre del destinatario** y su **torre y apartamento** (obligatorios — vienen en la etiqueta del paquete), y toma la **foto del paquete**. No se pide cédula al registrar — quien trajo el paquete es la transportadora
 2. El paquete **no tiene QR**: la llave es el nombre. En "Entregar paquete → No registrado" el guarda busca por nombre
 3. Al reclamar, la persona presenta su **cédula física**: el guarda coteja que el nombre coincida con el registrado, **digita el número de cédula** (queda como evidencia de quién reclamó) y marca la entrega
 4. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana un QR y el residente lo ve en su app

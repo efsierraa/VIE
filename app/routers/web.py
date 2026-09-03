@@ -89,6 +89,12 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
     out = []
     for p in pkgs:
         residente = usuarios.get(p.resident_id)
+        if p.tower and p.apartment:
+            destino = f"T{p.tower} · {p.apartment}"  # el destino grabado en el paquete
+        elif not p.tercero and residente:
+            destino = f"T{residente.tower} · {residente.apartment}"  # registros viejos: perfil
+        else:
+            destino = ""
         out.append(
             {
                 "p": p,
@@ -96,7 +102,7 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
                 "foto_disponible": p.photo is not None,
                 "destinatario": (p.nombre_tercero or "—") if p.tercero else (residente.nombre_completo if residente else "—"),
                 "cedula": p.cedula_tercero or "",
-                "destino": "" if p.tercero or not residente else f"T{residente.tower} · {residente.apartment}",
+                "destino": destino,
                 "entrego": usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
             }
         )
