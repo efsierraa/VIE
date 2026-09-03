@@ -90,6 +90,13 @@
   <p class="hint">Aún no has creado visitas.</p>
   {% endif %}
   </div>
+  {% if pager_v.anterior or pager_v.siguiente %}
+  <p class="paginador">
+    {% if pager_v.anterior %}<a class="small" href="{{ pager_v.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_v.pagina }}</span>
+    {% if pager_v.siguiente %}<a class="small" href="{{ pager_v.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 
 <h1>Mis paquetes</h1>
@@ -120,6 +127,13 @@
   <p class="hint">Sin paquetes registrados.</p>
   {% endif %}
   </div>
+  {% if pager_p.anterior or pager_p.siguiente %}
+  <p class="paginador">
+    {% if pager_p.anterior %}<a class="small" href="{{ pager_p.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_p.pagina }}</span>
+    {% if pager_p.siguiente %}<a class="small" href="{{ pager_p.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 {% endblock %}
 

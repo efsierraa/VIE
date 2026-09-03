@@ -83,6 +83,13 @@
   <p class="hint">Sin ingresos que coincidan con el filtro.</p>
   {% endif %}
   </div>
+  {% if pager_ingresos.anterior or pager_ingresos.siguiente %}
+  <p class="paginador">
+    {% if pager_ingresos.anterior %}<a class="small" href="{{ pager_ingresos.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_ingresos.pagina }}</span>
+    {% if pager_ingresos.siguiente %}<a class="small" href="{{ pager_ingresos.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 {% endif %}
 
@@ -113,6 +120,13 @@
   <p class="hint">Sin paquetes que coincidan con el filtro.</p>
   {% endif %}
   </div>
+  {% if pager_paquetes.anterior or pager_paquetes.siguiente %}
+  <p class="paginador">
+    {% if pager_paquetes.anterior %}<a class="small" href="{{ pager_paquetes.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_paquetes.pagina }}</span>
+    {% if pager_paquetes.siguiente %}<a class="small" href="{{ pager_paquetes.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 {% endif %}
 {% endblock %}

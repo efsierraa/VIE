@@ -2,6 +2,7 @@ import base64
 import io
 import logging
 from datetime import datetime, time, timedelta, timezone
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 import openpyxl
@@ -108,6 +109,34 @@ def day_window_utc(day) -> tuple[datetime, datetime]:
     return start, end
 
 
+# --- Paginación (server-side, estilo Google: Anterior · Página N · Siguiente) --
+
+
+def _pagina(valor: str) -> int:
+    try:
+        return max(int(valor), 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def paginar(query, pagina: int, por: int):
+    """Slice de resultados sin COUNT: pide por+1 filas para saber si hay siguiente."""
+    items = query.offset((pagina - 1) * por).limit(por + 1).all()
+    return items[:por], pagina > 1, len(items) > por
+
+
+def pager(pagina: int, anterior: bool, siguiente: bool, ruta: str, filtros: dict, clave: str) -> dict:
+    """Contexto del paginador; los enlaces conservan todos los filtros."""
+    limpios = {k: v for k, v in filtros.items() if v}
+    return {
+        "pagina": pagina,
+        "anterior": anterior,
+        "siguiente": siguiente,
+        "url_anterior": ruta + "?" + urlencode({**limpios, clave: pagina - 1}),
+        "url_siguiente": ruta + "?" + urlencode({**limpios, clave: pagina + 1}),
+    }
+
+
 # --- Sesión ----------------------------------------------------------------
 
 
@@ -173,21 +202,19 @@ def acerca_page(request: Request, db: Session = Depends(get_db)):
 def residente_page(
     request: Request,
     user: User = Depends(require_page("residente")),
+    pagina_v: str = "1",
+    pagina_p: str = "1",
     db: Session = Depends(get_db),
 ):
-    visits = (
-        db.query(Visit)
-        .filter(Visit.resident_id == user.id)
-        .order_by(Visit.id.desc())
-        .limit(20)
-        .all()
+    visits, v_ant, v_sig = paginar(
+        db.query(Visit).filter(Visit.resident_id == user.id).order_by(Visit.id.desc()),
+        _pagina(pagina_v),
+        25,
     )
-    pkgs = (
-        db.query(Package)
-        .filter(Package.resident_id == user.id)
-        .order_by(Package.id.desc())
-        .limit(10)
-        .all()
+    pkgs, p_ant, p_sig = paginar(
+        db.query(Package).filter(Package.resident_id == user.id).order_by(Package.id.desc()),
+        _pagina(pagina_p),
+        25,
     )
     paquetes = []
     for p in pkgs:
@@ -203,11 +230,23 @@ def residente_page(
                 "qr": qr_data_uri(sign_package(p.uuid)) if en_porteria else None,
             }
         )
-    pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
+    pendientes = (
+        db.query(Package)
+        .filter(Package.resident_id == user.id, Package.status == "en_porteria")
+        .count()
+    )
     return templates.TemplateResponse(
         request,
         "residente.html",
-        {"user": user, "visits": visits, "paquetes": paquetes, "pendientes": pendientes, "tabs": []},
+        {
+            "user": user,
+            "visits": visits,
+            "paquetes": paquetes,
+            "pendientes": pendientes,
+            "pager_v": pager(_pagina(pagina_v), v_ant, v_sig, "/residente", {}, "pagina_v"),
+            "pager_p": pager(_pagina(pagina_p), p_ant, p_sig, "/residente", {}, "pagina_p"),
+            "tabs": [],
+        },
     )
 
 
@@ -248,14 +287,15 @@ def guarda_page(
 def guarda_paquetes_page(
     request: Request,
     user: User = Depends(require_page("guarda")),
+    pagina: str = "1",
     db: Session = Depends(get_db),
 ):
-    pendientes = (
+    pendientes, p_ant, p_sig = paginar(
         db.query(Package)
         .filter(Package.status == "en_porteria")
-        .order_by(Package.created_at.desc())
-        .limit(50)
-        .all()
+        .order_by(Package.created_at.desc()),
+        _pagina(pagina),
+        50,
     )
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     start_utc, _ = day_window_utc(today_local)
@@ -273,6 +313,7 @@ def guarda_paquetes_page(
             "user": user,
             "pendientes": paquetes_con_nombres(db, pendientes),
             "entregados_hoy": paquetes_con_nombres(db, entregados_hoy),
+            "pager_p": pager(_pagina(pagina), p_ant, p_sig, "/guarda/paquetes", {}, "pagina"),
             "tabs": nav_de("guarda", "paquetes"),
         },
     )
@@ -333,6 +374,8 @@ def admin_historial_page(
     estado: str = "",
     q: str = "",
     torre: str = "",
+    pagina_v: str = "1",
+    pagina_p: str = "1",
     db: Session = Depends(get_db),
 ):
     if tipo not in ("ingresos", "paquetes", "ambos"):
@@ -355,8 +398,9 @@ def admin_historial_page(
             fecha_dia = None
 
     visits = []
+    pager_ingresos = pager(1, False, False, "/admin/historial", {}, "pagina_v")
     if ver_ingresos:
-        query = db.query(Visit)
+        query = db.query(Visit).order_by(Visit.id.desc())
         if fecha_dia:
             start_utc, end_utc = day_window_utc(fecha_dia)
             query = query.filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc, Visit.entry_at <= end_utc)
@@ -368,11 +412,13 @@ def admin_historial_page(
                 query = query.filter(or_(Visit.visitor_name.ilike(like), Visit.subject.ilike(like)))
         if torre.strip():
             query = query.filter(Visit.tower == torre.strip().upper())
-        visits = query.order_by(Visit.id.desc()).limit(100).all()
+        visits, v_ant, v_sig = paginar(query, _pagina(pagina_v), 50)
+        pager_ingresos = pager(_pagina(pagina_v), v_ant, v_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q, "torre": torre}, "pagina_v")
 
     pkgs = []
+    pager_paquetes = pager(1, False, False, "/admin/historial", {}, "pagina_p")
     if ver_paquetes:
-        query = db.query(Package)
+        query = db.query(Package).order_by(Package.id.desc())
         if fecha_dia:
             start_utc, end_utc = day_window_utc(fecha_dia)
             query = query.filter(Package.created_at >= start_utc, Package.created_at <= end_utc)
@@ -388,7 +434,8 @@ def admin_historial_page(
                         Package.short_code.ilike(like),
                     )
                 )
-        pkgs = query.order_by(Package.id.desc()).limit(100).all()
+        pkgs, p_ant, p_sig = paginar(query, _pagina(pagina_p), 50)
+        pager_paquetes = pager(_pagina(pagina_p), p_ant, p_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q}, "pagina_p")
 
     return templates.TemplateResponse(
         request,
@@ -401,6 +448,8 @@ def admin_historial_page(
             "visits": visits,
             "names": name_map(db, visits) if visits else {},
             "paquetes_hist": paquetes_con_nombres(db, pkgs) if pkgs else [],
+            "pager_ingresos": pager_ingresos,
+            "pager_paquetes": pager_paquetes,
             "f_fecha": fecha,
             "f_estado": estado,
             "f_q": q,

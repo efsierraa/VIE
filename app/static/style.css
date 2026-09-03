@@ -252,6 +252,17 @@ a.stat:hover { border-color: var(--verde); }
 .tipo-links a.small:hover { background: #cfd8dc; color: #37474f; }
 .tipo-links a.small.activa { background: var(--verde); color: #fff; font-weight: 700; }
 .tipo-links a.small.activa:hover { background: var(--verde-oscuro); color: #fff; }
+
+/* Paginación: Anterior · Página N · Siguiente */
+.paginador {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.9rem;
+  color: var(--gris-texto);
+}
 @media (min-width: 560px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
 }

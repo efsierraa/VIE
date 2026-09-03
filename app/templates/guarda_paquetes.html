@@ -26,6 +26,13 @@
   <p class="hint">No hay paquetes pendientes por entregar.</p>
   {% endif %}
   </div>
+  {% if pager_p.anterior or pager_p.siguiente %}
+  <p class="paginador">
+    {% if pager_p.anterior %}<a class="small" href="{{ pager_p.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_p.pagina }}</span>
+    {% if pager_p.siguiente %}<a class="small" href="{{ pager_p.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 
 <section class="card">
