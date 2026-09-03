@@ -19,11 +19,11 @@ document.querySelectorAll("input[type=password]").forEach(inp => {
   btn.className = "pw-eye";
   btn.title = "Mostrar clave";
   btn.setAttribute("aria-label", "Mostrar clave");
-  btn.innerHTML = OJO;
+  btn.innerHTML = OJO_TACHADO; // oculta = ojo cerrado
   btn.addEventListener("click", () => {
     const oculta = inp.type === "password";
     inp.type = oculta ? "text" : "password";
-    btn.innerHTML = oculta ? OJO_TACHADO : OJO;
+    btn.innerHTML = oculta ? OJO : OJO_TACHADO; // visible = ojo abierto
     const texto = oculta ? "Ocultar clave" : "Mostrar clave";
     btn.title = texto;
     btn.setAttribute("aria-label", texto);
