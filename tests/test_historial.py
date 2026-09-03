@@ -19,6 +19,8 @@ def test_paginas_por_seccion_y_rol(client):
     assert "Registrar paquete" in paquetes.text
     assert "Pendientes por entregar" in paquetes.text
     assert "Entrada manual" not in paquetes.text
+    assert "Iniciar cámara" in paquetes.text  # la entrega lee QR con cámara propia
+    assert "reader-pkg" in paquetes.text
 
     # admin: tres páginas
     login(client, "admin1")

@@ -64,7 +64,11 @@
 
 <section class="card">
   <h2>Entregar paquete</h2>
-  <p class="hint">Digita el código que muestra el residente (la cámara de la sección Ingresos también lee el QR del paquete):</p>
+  <div id="reader-pkg" class="reader"></div>
+  <div class="row">
+    <button id="btn-cam-pkg" type="button">Iniciar cámara</button>
+  </div>
+  <p class="hint">Digita el código que muestra el residente o escanea el QR del paquete con la cámara:</p>
   <form id="pkg-scan-form" class="form inline">
     <input id="pkg-code" placeholder="Ej: K7M2PA" autocomplete="off">
     <button type="submit">Buscar</button>
@@ -106,6 +110,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 <script src="/static/js/porteria.js" defer></script>
 <script src="/static/js/guarda_paquetes.js" defer></script>
 {% endblock %}

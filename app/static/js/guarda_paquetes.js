@@ -128,11 +128,37 @@ document.getElementById("pkg-scan-form").addEventListener("submit", async e => {
   e.preventDefault();
   const code = document.getElementById("pkg-code").value.trim().toUpperCase();
   document.getElementById("pkg-code").value = "";
+  buscarPaquete(code);
+});
+
+function buscarPaquete(payload) {
   const box = document.getElementById("pkg-entrega");
-  const r = await fetch("/api/packages/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code})});
-  const j = await r.json();
-  if (!r.ok || !j.ok) { box.innerHTML = '<p class="alert error">' + esc(j.detail || "Error") + '</p>'; return; }
-  renderPaquete(j, box);
+  fetch("/api/packages/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)})
+    .then(r => r.json())
+    .then(j => {
+      if (!j.ok) { box.innerHTML = '<p class="alert error">' + esc(j.detail || "Error") + '</p>'; return; }
+      renderPaquete(j, box);
+    })
+    .catch(() => { box.innerHTML = '<p class="alert error">Error de conexión</p>'; });
+}
+
+// Cámara dedicada a los QR de paquetes de esta sección
+let escanerPkg = null;
+document.getElementById("btn-cam-pkg").addEventListener("click", async () => {
+  if (escanerPkg) return;
+  const box = document.getElementById("pkg-entrega");
+  try {
+    escanerPkg = new Html5Qrcode("reader-pkg");
+    await escanerPkg.start({facingMode: "environment"}, {fps: 10, qrbox: 250}, text => {
+      escanerPkg.pause(true);
+      buscarPaquete({token: text.trim()});
+      setTimeout(() => escanerPkg.resume(), 2500);
+    });
+    document.getElementById("btn-cam-pkg").disabled = true;
+  } catch (err) {
+    box.innerHTML = '<p class="alert error">No se pudo iniciar la cámara. Digita el código del paquete.</p>';
+    escanerPkg = null;
+  }
 });
 
 document.getElementById("tercero-form").addEventListener("submit", async e => {
