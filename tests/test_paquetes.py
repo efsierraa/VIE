@@ -33,13 +33,13 @@ def test_flujo_completo_paquete(client):
     code = pkg["short_code"]
     assert len(code) == 6
 
-    # el residente lo ve con foto y QR
+    # el residente lo ve con foto y QR (el servidor re-codifica todo a JPEG)
     login(client, "residente1")
     r = client.get("/api/packages/mine")
     j = r.json()
     assert j["pendientes"] == 1
     mios = next(p for p in j["packages"] if p["uuid"] == pkg["uuid"])
-    assert mios["photo_data_uri"].startswith("data:image/png;base64,")
+    assert mios["photo_data_uri"].startswith("data:image/jpeg;base64,")
     assert mios["qr_data_uri"].startswith("data:image/png;base64,")
 
     r = client.get(f"/api/packages/{pkg['uuid']}/pass")
@@ -49,7 +49,7 @@ def test_flujo_completo_paquete(client):
     login(client, "guarda1")
     r = client.post("/api/packages/scan", json={"code": code.lower()})
     assert r.status_code == 200
-    assert r.json()["package"]["photo_data_uri"].startswith("data:image/png;base64,")
+    assert r.json()["package"]["photo_data_uri"].startswith("data:image/jpeg;base64,")
     assert r.json()["package"]["status"] == "en_porteria"
     assert r.json()["residente"]["tower"] == "1"
 

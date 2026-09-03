@@ -2,19 +2,21 @@ import base64
 import binascii
 import csv
 import io
+import logging
 import re
 import secrets
 from datetime import timedelta
 from uuid import uuid4
 
 import qrcode
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, require_api, verify_password
 from app.database import get_db
+from app.limitador import registrar_intento, verificar_limite
 from app.models import (
     DIAS_FOTO_ENTREGADA,
     ROLES,
@@ -28,6 +30,7 @@ from app.security import sign_package, sign_visit, verify_package_token, verify_
 from app.utils import format_duration, utcnow
 
 router = APIRouter(prefix="/api")
+log = logging.getLogger("vie")
 
 # Sin letras ambiguas (I, L, O se confunden con 1, 0)
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -124,6 +127,7 @@ def _crear_usuario(
     role: str,
     tower: str | None = None,
     apartment: str | None = None,
+    creado_por: str = "sistema",
 ) -> User:
     """Crea un usuario validando todo; levanta ValueError con el mensaje para el humano."""
     username = username.strip().lower()
@@ -133,8 +137,8 @@ def _crear_usuario(
     apartment = (apartment or "").strip() or None
     if len(username) < 3:
         raise ValueError("El usuario debe tener al menos 3 caracteres")
-    if len(password) < 6:
-        raise ValueError("La clave debe tener al menos 6 caracteres")
+    if len(password) < 8:
+        raise ValueError("La clave debe tener al menos 8 caracteres")
     if not nombres or not apellidos:
         raise ValueError("Nombres y apellidos son obligatorios")
     if role not in ROLES:
@@ -155,6 +159,7 @@ def _crear_usuario(
     db.add(user)
     db.commit()
     db.refresh(user)
+    log.info("usuario_creado username=%s rol=%s por=%s", user.username, user.role, creado_por)
     return user
 
 
@@ -247,10 +252,13 @@ def visit_pass(
 
 @router.post("/scan")
 def scan(
+    request: Request,
     data: ScanIn,
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
+    verificar_limite(request, "scan", 120, 600)
+    registrar_intento(request, "scan")
     if data.action not in ("entrada", "salida"):
         raise HTTPException(400, "Acción no válida")
 
@@ -351,6 +359,7 @@ def create_user(
             role=data.role,
             tower=data.tower,
             apartment=data.apartment,
+            creado_por=admin.username,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -395,10 +404,12 @@ async def import_users_csv(
                 role=rol,
                 tower=torre,
                 apartment=apto,
+                creado_por=f"{admin.username} (csv)",
             )
             creados += 1
         except ValueError as e:
             errores.append(f"línea {num}: {e}")
+    log.info("csv_importado por=%s creados=%s errores=%s", admin.username, creados, len(errores))
     return {"ok": True, "creados": creados, "errores": errores}
 
 
@@ -410,28 +421,34 @@ def assign_password(
     db: Session = Depends(get_db),
 ):
     """Asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar)."""
-    if len(data.nueva) < 6:
-        raise HTTPException(400, "La clave debe tener al menos 6 caracteres")
+    if len(data.nueva) < 8:
+        raise HTTPException(400, "La clave debe tener al menos 8 caracteres")
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(404, "Usuario no encontrado")
     user.password_hash = hash_password(data.nueva)
     db.commit()
+    log.info("clave_asignada admin=%s destino=%s", admin.username, user.username)
     return {"ok": True}
 
 
 @router.post("/me/password")
 def change_my_password(
+    request: Request,
     data: PasswordChange,
     user: User = Depends(require_api()),
     db: Session = Depends(get_db),
 ):
+    verificar_limite(request, "pw-me", 10, 600)
     if not verify_password(data.actual, user.password_hash):
+        registrar_intento(request, "pw-me")
+        log.warning("cambio_clave_fallado usuario=%s ip=%s", user.username, request.client.host if request.client else "?")
         raise HTTPException(400, "La clave actual es incorrecta")
-    if len(data.nueva) < 6:
-        raise HTTPException(400, "La nueva clave debe tener al menos 6 caracteres")
+    if len(data.nueva) < 8:
+        raise HTTPException(400, "La nueva clave debe tener al menos 8 caracteres")
     user.password_hash = hash_password(data.nueva)
     db.commit()
+    log.info("clave_cambiada usuario=%s", user.username)
     return {"ok": True}
 
 
@@ -453,7 +470,13 @@ class PackageScanIn(BaseModel):
 
 
 def decodificar_foto(data_uri: str) -> tuple[bytes, str]:
-    """Acepta data URI y devuelve (bytes, mime). Cap de tamaño y mimetypes permitidos."""
+    """Valida que sea una imagen real, quita EXIF (GPS, dispositivo) y reescala a JPEG.
+
+    La re-codificación con Pillow es la barrera de verdad: aunque el cliente
+    comprima, aquí se normaliza el tamaño y se elimina cualquier metadato.
+    """
+    from PIL import Image
+
     try:
         encabezado, b64 = data_uri.split(",", 1)
     except ValueError:
@@ -462,14 +485,27 @@ def decodificar_foto(data_uri: str) -> tuple[bytes, str]:
     if mime not in FOTO_MIMES:
         raise ValueError("Tipo de imagen no permitido")
     try:
-        foto = base64.b64decode(b64, validate=True)
+        crudo = base64.b64decode(b64, validate=True)
     except (binascii.Error, ValueError):
         raise ValueError("Foto corrupta")
-    if len(foto) > FOTO_MAX_BYTES:
-        raise ValueError("Foto demasiado grande")
-    if not foto:
+    if not crudo:
         raise ValueError("Foto vacía")
-    return foto, mime
+    if len(crudo) > FOTO_MAX_BYTES:
+        raise ValueError("Foto demasiado grande")
+    try:
+        img = Image.open(io.BytesIO(crudo))
+        img.load()
+    except Exception:
+        raise ValueError("El archivo no es una imagen válida")
+    if img.format not in ("JPEG", "PNG", "WEBP"):
+        raise ValueError("Tipo de imagen no permitido")
+
+    img = img.convert("RGB")
+    if max(img.size) > 1200:
+        img.thumbnail((1200, 1200))
+    salida = io.BytesIO()
+    img.save(salida, "JPEG", quality=85)
+    return salida.getvalue(), "image/jpeg"
 
 
 def package_dict(p: Package, include_photo: bool = False) -> dict:
@@ -592,11 +628,14 @@ def registrar_paquete(
 
 @router.post("/packages/scan")
 def escanear_paquete(
+    request: Request,
     data: PackageScanIn,
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
     """Muestra el paquete con su foto; no marca nada hasta que el guarda confirme la entrega."""
+    verificar_limite(request, "scan-pkg", 60, 600)
+    registrar_intento(request, "scan-pkg")
     if data.code:
         pkg = db.query(Package).filter(Package.short_code == data.code.strip().upper()).first()
         if pkg is None:
@@ -640,6 +679,7 @@ def entregar_paquete(
     pkg.delivered_by = guard.id
     pkg.photo_delete_after = utcnow() + timedelta(days=DIAS_FOTO_ENTREGADA)
     db.commit()
+    log.info("paquete_entregado codigo=%s por=%s", pkg.short_code, guard.username)
     return {"ok": True, "package": package_dict(pkg)}
 
 
@@ -659,6 +699,7 @@ def cancelar_paquete(
     pkg.photo = None
     pkg.photo_mime = None
     db.commit()
+    log.info("paquete_cancelado codigo=%s por=%s", pkg.short_code, guard.username)
     return {"ok": True, "package": package_dict(pkg)}
 
 
@@ -748,4 +789,5 @@ def toggle_user(
         raise HTTPException(400, "No puedes desactivar tu propia cuenta")
     user.active = not user.active
     db.commit()
+    log.info("cuenta_%s username=%s por=%s", "activada" if user.active else "desactivada", user.username, admin.username)
     return {"ok": True, "active": user.active}

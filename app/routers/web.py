@@ -1,6 +1,7 @@
 import io
 import base64
 import io
+import logging
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -20,10 +21,13 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
+from app.limitador import registrar_intento, verificar_limite
 from app.models import Package, Visit, User
 from app.routers.api import qr_data_uri
 from app.security import sign_package
 from app.utils import format_duration, utcnow
+
+log = logging.getLogger("vie")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -91,11 +95,15 @@ def login(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    verificar_limite(request, "login", 10, 600)
     user = db.query(User).filter(User.username == username.strip().lower()).first()
     if user is None or not user.active or not verify_password(password, user.password_hash):
+        registrar_intento(request, "login")
+        log.warning("login_fallido ip=%s usuario=%s", request.client.host if request.client else "?", username)
         return templates.TemplateResponse(
             request, "login.html", {"user": None, "error": "Usuario o clave incorrectos"}
         )
+    log.info("login_ok usuario=%s", user.username)
     response = RedirectResponse(HOME[user.role], status_code=303)
     create_session(response, user.id)
     return response

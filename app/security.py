@@ -4,11 +4,17 @@ El QR no se cifra: lleva el uuid de la visita firmado con HMAC.
 Cualquiera puede leerlo, nadie puede alterarlo. La vigencia y el
 uso único se controlan en la base de datos, no en el papel del código.
 """
+import logging
 import os
 
 from itsdangerous import BadSignature, TimestampSigner
 
 SECRET = os.environ.get("VIE_SECRET", "dev-secret-change-me")
+if SECRET == "dev-secret-change-me":
+    logging.getLogger("vie").warning(
+        "VIE_SECRET sin configurar: se usa el valor por defecto. "
+        "Solo aceptable en desarrollo; en producción las firmas quedan adivinables."
+    )
 _signer = TimestampSigner(SECRET, salt="vie-qr-v1")
 _pkg_signer = TimestampSigner(SECRET, salt="vie-pkg-v1")
 

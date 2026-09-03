@@ -115,6 +115,15 @@ Laura,Restrepo,lrestrepo,clave789,residente,5,1204
 
 Listo: entra a `https://vie-XXXX.onrender.com` con esa cuenta y crea los residentes y guardas desde la pantalla de administración.
 
+## Seguridad
+
+- Claves con bcrypt (mínimo 8), sesiones firmadas con expiración, autorización por rol y por propietario
+- QR firmados con HMAC (sal separada por dominio), un solo uso, vigencia en base de datos
+- Limitador de fuerza bruta, cabeceras de seguridad (CSP, HSTS...), fotos validadas y sin EXIF en el servidor
+- Eventos de seguridad en el log; dependencias vigiladas con Dependabot
+
+Auditoría completa y mapeo a SOC 2 / Ley 1581 en [auditoria_seguridad.md](auditoria_seguridad.md). Cómo reportar una vulnerabilidad: [SECURITY.md](SECURITY.md).
+
 ## Tests
 
 ```powershell

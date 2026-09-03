@@ -7,8 +7,8 @@
   <h2>Cambiar mi clave</h2>
   <form id="pw-form" class="form">
     <label>Clave actual <input type="password" name="actual" required></label>
-    <label>Nueva clave <input type="password" name="nueva" required minlength="6"></label>
-    <label>Repetir nueva clave <input type="password" name="repetir" required minlength="6"></label>
+    <label>Nueva clave <input type="password" name="nueva" required minlength="8"></label>
+    <label>Repetir nueva clave <input type="password" name="repetir" required minlength="8"></label>
     <button type="submit">Guardar clave</button>
   </form>
   <p class="hint">Si olvidaste tu clave, administración puede asignarte una nueva.</p>
@@ -16,16 +16,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-const form = document.getElementById("pw-form");
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(form).entries());
-  if (data.nueva !== data.repetir) { alert("Las claves nuevas no coinciden"); return; }
-  const r = await fetch("/api/me/password", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({actual: data.actual, nueva: data.nueva})});
-  const j = await r.json();
-  if (r.ok && j.ok) { alert("Clave actualizada."); form.reset(); }
-  else alert(j.detail || "Error cambiando la clave");
-});
-</script>
+<script src="/static/js/cuenta.js" defer></script>
 {% endblock %}

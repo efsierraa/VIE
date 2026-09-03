@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -39,6 +40,27 @@ app = FastAPI(title="VIE — Vigilancia de Ingresos y Egresos", lifespan=lifespa
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web.router)
 app.include_router(api.router)
+
+
+@app.middleware("http")
+async def cabeceras_seguridad(request: Request, call_next):
+    """Cabeceras básicas de seguridad en todas las respuestas."""
+    respuesta = await call_next(request)
+    h = respuesta.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "same-origin")
+    h.setdefault("Permissions-Policy", "camera=(self), geolocation=(), payment=()")
+    h.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net; connect-src 'self'; "
+        "font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
+        "frame-ancestors 'none'",
+    )
+    if os.environ.get("VIE_COOKIE_SECURE") == "1":
+        h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return respuesta
 
 
 @app.exception_handler(web.LoginRequired)

@@ -2,6 +2,7 @@ import os
 
 os.environ["VIE_DATABASE_URL"] = "sqlite:///./test_vie.db"
 os.environ["VIE_SECRET"] = "test-secret-vie"
+os.environ["VIE_RATE_LIMIT"] = "0"  # los tests hacen muchos intentos seguidos
 
 import pytest
 from fastapi.testclient import TestClient
