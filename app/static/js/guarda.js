@@ -59,7 +59,12 @@ function renderPaquete(j, box) {
     '<p><strong>' + esc(j.residente.nombre) + '</strong> · Torre ' + esc(j.residente.tower) + ' · ' + esc(j.residente.apartment) +
     (j.package.description ? '<br>' + esc(j.package.description) : '') + '</p>' +
     '<button id="btn-entregar" type="button">Marcar entregado</button>';
-  enlazarEntregar(j.package.uuid, box, "Paquete entregado. El residente debe confirmar en su app.");
+  enlazarEntregar(
+    j.package.uuid,
+    box,
+    "Paquete entregado. El residente debe confirmar en su app.",
+    "¿Confirmas que entregaste el paquete a " + j.residente.nombre + " (Torre " + j.residente.tower + " · " + j.residente.apartment + ")?"
+  );
 }
 
 function renderTercero(p, box) {
@@ -73,6 +78,7 @@ function renderTercero(p, box) {
   document.getElementById("btn-entregar").addEventListener("click", async () => {
     const cedula = document.getElementById("tercero-cedula").value.trim();
     if (!cedula) { alert("Digita el número de cédula de quien reclama"); return; }
+    if (!confirm("¿Confirmas que entregaste el paquete a " + p.nombre_tercero + " (cédula " + cedula + ")?")) return;
     const r2 = await fetch("/api/packages/" + p.uuid + "/entregar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({cedula})});
     const j2 = await r2.json();
     if (r2.ok && j2.ok) {
@@ -84,8 +90,9 @@ function renderTercero(p, box) {
   });
 }
 
-function enlazarEntregar(uuid, box, mensajeOk) {
+function enlazarEntregar(uuid, box, mensajeOk, confirmMsg) {
   document.getElementById("btn-entregar").addEventListener("click", async () => {
+    if (confirmMsg && !confirm(confirmMsg)) return;
     const r2 = await fetch("/api/packages/" + uuid + "/entregar", {method: "POST"});
     const j2 = await r2.json();
     if (r2.ok && j2.ok) {

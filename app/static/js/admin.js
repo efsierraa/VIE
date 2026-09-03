@@ -20,6 +20,10 @@ form.addEventListener("submit", async e => {
 
 document.querySelectorAll("[data-toggle]").forEach(btn => btn.addEventListener("click", async e => {
   e.preventDefault();
+  const fila = btn.closest("tr");
+  const nombre = fila && fila.querySelectorAll("td")[1] ? fila.querySelectorAll("td")[1].textContent.trim() : "esta cuenta";
+  const desactivando = btn.textContent.trim() === "Desactivar";
+  if (!confirm("¿Seguro que quieres " + (desactivando ? "desactivar" : "activar") + " la cuenta de " + nombre + "?")) return;
   const r = await fetch("/api/users/" + btn.dataset.toggle + "/toggle", {method: "POST"});
   if (r.ok) location.reload();
   else { const j = await r.json(); alert(j.detail || "Error"); }

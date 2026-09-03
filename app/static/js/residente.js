@@ -93,7 +93,9 @@ document.getElementById("btn-copy").onclick = () => {
 };
 
 document.querySelectorAll("[data-cancel]").forEach(btn => btn.addEventListener("click", async () => {
-  if (!confirm("¿Cancelar esta visita?")) return;
+  const fila = btn.closest("tr");
+  const codigo = fila && fila.querySelector("strong") ? fila.querySelector("strong").textContent.trim() : "";
+  if (!confirm("¿Cancelar la visita con código " + codigo + "? El QR dejará de funcionar y no se puede recuperar.")) return;
   const r = await fetch("/api/visits/" + btn.dataset.cancel + "/cancel", {method: "POST"});
   if (r.ok) location.reload();
   else { const j = await r.json(); alert(j.detail || "No se pudo cancelar"); }
