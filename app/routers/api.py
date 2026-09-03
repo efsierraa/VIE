@@ -2,6 +2,7 @@ import base64
 import binascii
 import csv
 import io
+import re
 import secrets
 from datetime import timedelta
 from uuid import uuid4
@@ -9,7 +10,7 @@ from uuid import uuid4
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, require_api, verify_password
@@ -507,6 +508,10 @@ def limpiar_fotos_vencidas(db: Session) -> int:
     return len(vencidos)
 
 
+# Torre y apto juntos: "T4 1005", "4 1005", "4-1005", "t4.1005". El apto siempre lleva dígitos.
+TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-z0-9]*\d[A-Za-z0-9]*)$", re.IGNORECASE)
+
+
 @router.get("/residentes")
 def buscar_residentes(
     q: str = "",
@@ -514,18 +519,31 @@ def buscar_residentes(
     db: Session = Depends(get_db),
 ):
     query = db.query(User).filter(User.role == "residente", User.active.is_(True))
-    if q.strip():
-        like = f"%{q.strip()}%"
-        query = query.filter(
-            or_(
-                User.username.ilike(like),
-                User.nombres.ilike(like),
-                User.apellidos.ilike(like),
-                User.tower.ilike(like),
-                User.apartment.ilike(like),
-            )
-        )
-    users = query.order_by(User.tower, User.apartment, User.username).limit(10).all()
+    q = q.strip()
+    users = []
+    if q:
+        m = TORRE_APTO_RE.match(q)
+        if m:
+            # destino exacto: torre Y apartamento, nunca uno solo
+            torre = (m.group(1) or m.group(2)).upper()
+            apto = m.group(3)
+            query = query.filter(func.upper(User.tower) == torre, User.apartment.ilike(apto))
+            users = query.order_by(User.apartment, User.username).limit(10).all()
+        else:
+            # por nombre: cada palabra (con letras) debe aparecer en usuario, nombres o apellidos.
+            # los números solos no buscan: apto o torre sin su par darían demasiados resultados
+            tokens = [t for t in q.split() if not t.isdigit()]
+            if tokens:
+                for token in tokens:
+                    like = f"%{token}%"
+                    query = query.filter(
+                        or_(
+                            User.username.ilike(like),
+                            User.nombres.ilike(like),
+                            User.apellidos.ilike(like),
+                        )
+                    )
+                users = query.order_by(User.tower, User.apartment, User.username).limit(10).all()
     return {
         "ok": True,
         "residentes": [

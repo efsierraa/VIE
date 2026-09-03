@@ -13,7 +13,7 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 ### Paquetes
 
-1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente.
+1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente. Para encontrarlo busca por nombre o apellido; si va por destino, **torre y apartamento juntos**: `T4 1005`, `4 1005`, `4-1005` o `T4.1005` — torre sola o apto solo no arroja resultados (serían demasiados).
 2. El residente ve el aviso en su app: foto, descripción, código corto y **QR para reclamarlo**.
 3. En portería el residente muestra el QR → el guarda **ve la foto** → busca el paquete → **"Marcar entregado"**.
 4. El residente **confirma la recepción** (o marca "No lo recibí" → queda en disputa para administración).

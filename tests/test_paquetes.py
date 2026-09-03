@@ -144,6 +144,29 @@ def test_limpieza_fotos_vencidas(client):
     db.close()
 
 
+def test_busqueda_de_residentes(client):
+    login(client, "guarda1")
+
+    def buscar(q):
+        return client.get("/api/residentes", params={"q": q}).json()["residentes"]
+
+    # torre y apto juntos, en todos los formatos
+    r = buscar("T1 101")
+    assert len(r) == 1 and r[0]["username"] == "residente1"
+    assert len(buscar("1 101")) == 1
+    assert len(buscar("1-101")) == 1
+    assert len(buscar("t1.101")) == 1
+
+    # torre sola o apto solo: no sirven, cero resultados
+    assert buscar("1") == []
+    assert buscar("101") == []
+
+    # por nombre: apellido solo, o nombres y apellidos juntos
+    assert len(buscar("Uno")) == 1
+    assert len(buscar("Residenta Uno")) == 1
+    assert len(buscar("residente1")) == 1
+
+
 def test_export_incluye_hoja_paquetes(client):
     import openpyxl
 
