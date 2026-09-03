@@ -155,6 +155,17 @@ def logout():
     return response
 
 
+@router.get("/acerca", response_class=HTMLResponse)
+def acerca_page(request: Request, db: Session = Depends(get_db)):
+    """Pública: la historia, principios y cómo colaborar. Sin sesión también."""
+    user = current_user_or_none(request, db)
+    return templates.TemplateResponse(
+        request,
+        "acerca.html",
+        {"user": user, "tabs": nav_de(user.role) if user else []},
+    )
+
+
 # --- Residente ---------------------------------------------------------------
 
 

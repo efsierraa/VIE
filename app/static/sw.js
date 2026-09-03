@@ -1,4 +1,4 @@
-const CACHE = "vie-v1";
+const CACHE = "vie-v2";
 const ASSETS = ["/static/style.css", "/static/app.js", "/static/manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -16,19 +16,18 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// Network-first para /static: el diseño más reciente siempre, el caché solo salva sin internet
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.pathname.startsWith("/static/")) {
     e.respondWith(
-      caches.match(e.request).then(
-        (hit) =>
-          hit ||
-          fetch(e.request).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-            return res;
-          })
-      )
+      fetch(e.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
     );
   }
 });

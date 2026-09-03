@@ -26,32 +26,7 @@ body {
   flex-direction: column;
   max-width: 100%;
   overflow-x: hidden; /* red de seguridad: nada desplaza la página lateralmente */
-  padding-bottom: 3.5rem; /* espacio para la barra de navegación inferior */
-}
-
-/* Barra inferior de navegación por secciones (móvil) */
-.tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  background: var(--verde-oscuro);
-  z-index: 20;
-}
-.tabbar a {
-  flex: 1;
-  text-align: center;
-  padding: 0.85rem 0.3rem;
-  color: #fff;
-  text-decoration: none;
-  font-size: 0.9rem;
-  opacity: 0.7;
-}
-.tabbar a.activa {
-  opacity: 1;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.25);
+  padding-bottom: 4.5rem; /* espacio para que el menú flotante no tape el pie */
 }
 
 /* Textos largos estilo Google: recortados a 2 líneas, click para expandir */
@@ -346,6 +321,92 @@ details.card[open] summary { margin-bottom: 0.8rem; }
   font-size: 0.8rem;
   color: var(--gris-texto);
 }
+.foot a { color: var(--verde-oscuro); }
+
+/* Menú flotante: botón circular que despliega las secciones */
+.menu-flotante {
+  position: fixed;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  z-index: 30;
+}
+.menu-toggle { display: none; }
+.fab {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.fab:hover { background: var(--verde-oscuro); }
+.fab .fab-cerrar { display: none; }
+.menu-toggle:checked ~ .fab .fab-abrir { display: none; }
+.menu-toggle:checked ~ .fab .fab-cerrar { display: inline; }
+.menu-panel {
+  position: absolute;
+  bottom: 4.2rem;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  min-width: 11rem;
+  background: #fff;
+  border: 1px solid var(--gris-borde);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+}
+.menu-toggle:checked ~ .menu-panel { display: flex; }
+.menu-panel a {
+  padding: 0.75rem 1rem;
+  color: #263238;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.menu-panel a:hover { background: var(--verde-suave); }
+.menu-panel a.activa {
+  background: var(--verde-suave);
+  color: var(--verde-oscuro);
+  font-weight: 700;
+}
+
+/* Página Acerca de */
+.acerca-hero { margin-top: 1.5rem; }
+.logo-acerca {
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--verde);
+}
+.eslogan {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--verde-oscuro);
+  margin: 0.4rem 0 0.2rem;
+}
+.principios { list-style: none; padding: 0; margin: 0; }
+.principios li { padding: 0.4rem 0; border-bottom: 1px solid #eef1f0; }
+.principios li:last-child { border-bottom: none; }
+a.github {
+  display: inline-block;
+  background: #24292e;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+a.github:hover { background: #000; }
 
 @media (max-width: 480px) {
   th, td { padding: 0.35rem 0.3rem; font-size: 0.82rem; }
