@@ -183,17 +183,23 @@ td small { color: var(--gris-texto); }
   border-radius: 8px;
 }
 
-/* Ver/Ocultar clave */
-.pw-wrap { display: flex; gap: 0.4rem; min-width: 0; }
-.pw-wrap input { flex: 1 1 auto; width: auto; min-width: 0; }
-.pw-toggle {
-  padding: 0.4rem 0.7rem;
-  font-size: 0.85rem;
-  background: #eceff1;
-  color: #37474f;
-  white-space: nowrap;
+/* Ver/Ocultar clave: ojo dentro del campo */
+.pw-field { position: relative; display: block; }
+.pw-field input { padding-right: 2.6rem; }
+.pw-eye {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0.25rem;
+  color: var(--gris-texto);
+  cursor: pointer;
+  line-height: 0;
 }
-.pw-toggle:hover { background: #cfd8dc; }
+.pw-eye:hover { background: none; color: var(--verde-oscuro); }
 
 /* Tablas anchas: scroll horizontal dentro de la tarjeta, sin romper el layout */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
