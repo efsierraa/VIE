@@ -21,13 +21,14 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 ### Paquetes para alguien NO registrado
 
-Cuando el paquete es de una persona sin cuenta (lo más probable: un residente nuevo), el guarda marca **"El destinatario NO está registrado"** al registrarlo:
+Cuando el paquete llega por transportadora para una persona sin cuenta (lo más probable: un residente nuevo), el guarda marca **"El destinatario NO está registrado"** al registrarlo:
 
-1. Digita **nombre y cédula**, toma la **foto del paquete** y la **foto de la cédula**
-2. El paquete **no tiene QR**: la cédula es la llave. En "Entregar paquete → No registrado" el guarda busca por cédula o nombre, compara a la persona con la foto de la cédula y marca la entrega
-3. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana un QR y el residente lo ve en su app
-4. Si nunca se asigna, el paquete se entrega con la cédula y queda en el historial
-5. Las fotos (paquete y cédula) se borran solas 30 días después de la entrega
+1. Digita el **nombre del destinatario** (el de la etiqueta del paquete) y toma la **foto del paquete**. No se pide cédula al registrar — quien trajo el paquete es la transportadora
+2. El paquete **no tiene QR**: la llave es el nombre. En "Entregar paquete → No registrado" el guarda busca por nombre
+3. Al reclamar, la persona presenta su **cédula física**: el guarda coteja que el nombre coincida con el registrado, **digita el número de cédula** (queda como evidencia de quién reclamó) y marca la entrega
+4. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana un QR y el residente lo ve en su app
+5. Si nunca se asigna, el paquete se entrega con la cédula y queda en el historial
+6. La foto del paquete se borra sola 30 días después de la entrega; el número de cédula queda en el registro como evidencia
 
 Si la app falla, el guarda registra a mano (entrada manual) o se vuelve al método de siempre: llamar y anotar.
 

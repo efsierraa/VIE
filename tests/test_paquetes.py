@@ -229,33 +229,36 @@ def test_paquete_tercero_flujo(client):
         "/api/packages/manual",
         json={
             "nombre": "Nuevo Vecino",
-            "cedula": "1020304050",
             "description": "paquete de fontanería",
             "photo_b64": FOTO,
-            "cedula_b64": FOTO,
         },
     )
     assert r.status_code == 200, r.json()
     pkg = r.json()["package"]
     assert pkg["tercero"] is True
     assert pkg["short_code"] is None  # sin QR: la cédula es la llave
+    assert pkg["cedula_tercero"] is None  # la cédula se registra solo al reclamar
 
     # un residente NO lo ve en su app (los paquetes tercero no tienen dueño con cuenta)
     login(client, "residente1")
     mios = client.get("/api/packages/mine").json()
     assert all(p["uuid"] != pkg["uuid"] for p in mios["packages"])
 
-    # el guarda busca por cédula y por nombre: ve fotos de paquete y cédula
+    # el guarda busca por nombre: ve la foto del paquete
     login(client, "guarda1")
-    lista = client.get("/api/packages/terceros", params={"q": "1020304050"}).json()["paquetes"]
+    lista = client.get("/api/packages/terceros", params={"q": "Nuevo"}).json()["paquetes"]
     assert len(lista) == 1
     assert lista[0]["photo_data_uri"].startswith("data:image/")
-    assert lista[0]["cedula_data_uri"].startswith("data:image/")
-    assert len(client.get("/api/packages/terceros", params={"q": "Nuevo"}).json()["paquetes"]) == 1
 
-    # entrega con cédula
+    # sin cédula no se entrega: se coteja el nombre con la cédula física
     r = client.post(f"/api/packages/{pkg['uuid']}/entregar")
+    assert r.status_code == 400
+    assert "cédula" in r.json()["detail"]
+
+    # entrega con la cédula de quien reclama, que queda como evidencia
+    r = client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "1020304050"})
     assert r.status_code == 200
+    assert r.json()["package"]["cedula_tercero"] == "1020304050"
 
     # ya no aparece en la búsqueda (solo en_porteria)
     restantes = client.get("/api/packages/terceros").json()["paquetes"]
@@ -266,7 +269,7 @@ def test_paquete_tercero_asignar_a_residente_nuevo(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Vecino Pendiente", "cedula": "98765", "photo_b64": FOTO, "cedula_b64": FOTO},
+        json={"nombre": "Vecino Pendiente", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
 
@@ -301,7 +304,7 @@ def test_paquete_tercero_asignar_a_residente_nuevo(client):
 
 def test_paquete_tercero_permisos(client):
     login(client, "residente1")
-    r = client.post("/api/packages/manual", json={"nombre": "x", "cedula": "y", "photo_b64": FOTO, "cedula_b64": FOTO})
+    r = client.post("/api/packages/manual", json={"nombre": "x", "photo_b64": FOTO})
     assert r.status_code == 403
     r = client.post("/api/packages/abc/asignar", json={"username": "residente1"})
     assert r.status_code == 403
@@ -312,24 +315,24 @@ def test_paquete_tercero_permisos(client):
 
 def test_paquete_tercero_validacion(client):
     login(client, "guarda1")
-    r = client.post("/api/packages/manual", json={"nombre": "", "cedula": "123", "photo_b64": FOTO, "cedula_b64": FOTO})
+    r = client.post("/api/packages/manual", json={"nombre": "", "photo_b64": FOTO})
     assert r.status_code == 400
-    r = client.post("/api/packages/manual", json={"nombre": "Alguien", "cedula": "123", "photo_b64": FOTO})
-    assert r.status_code == 422  # falta la foto de la cédula
+    r = client.post("/api/packages/manual", json={"nombre": "Alguien"})
+    assert r.status_code == 422  # falta la foto del paquete
 
 
-def test_limpieza_borra_tambien_foto_cedula(client):
+def test_limpieza_foto_tercero_deja_evidencia_de_cedula(client):
     login(client, "guarda1")
     r = client.post(
         "/api/packages/manual",
-        json={"nombre": "Cedula Limpia", "cedula": "556677", "photo_b64": FOTO, "cedula_b64": FOTO},
+        json={"nombre": "Evidencia Cedula", "photo_b64": FOTO},
     )
     pkg = r.json()["package"]
-    client.post(f"/api/packages/{pkg['uuid']}/entregar")
+    client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "556677"})
 
     db = SessionLocal()
     p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
-    assert p.foto_cedula is not None
+    assert p.photo is not None
     p.photo_delete_after = utcnow() - timedelta(minutes=1)
     db.commit()
     db.close()
@@ -338,7 +341,7 @@ def test_limpieza_borra_tambien_foto_cedula(client):
     limpiar_fotos_vencidas(db)
     p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
     assert p.photo is None
-    assert p.foto_cedula is None  # dato sensible: mismo plazo de borrado
+    assert p.cedula_tercero == "556677"  # la cédula queda en el registro como evidencia
     db.close()
 
 
@@ -349,7 +352,7 @@ def test_export_incluye_hoja_paquetes(client):
     _registrar_paquete(client)
     client.post(
         "/api/packages/manual",
-        json={"nombre": "Tercero Excel", "cedula": "204060", "photo_b64": FOTO, "cedula_b64": FOTO},
+        json={"nombre": "Tercero Excel", "photo_b64": FOTO},
     )
     login(client, "admin1")
     r = client.get("/admin/exportar")

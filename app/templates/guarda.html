@@ -60,17 +60,10 @@
       <input type="hidden" id="pkg-resident-id">
     </div>
     <div id="pkg-bloque-tercero" class="hidden">
-      <label>Nombre del destinatario
+      <label>Nombre del destinatario (como aparece en el paquete)
         <input id="pkg-tercero-nombre" maxlength="120">
       </label>
-      <label>Cédula
-        <input id="pkg-tercero-cedula" maxlength="30">
-      </label>
-      <label>Foto de la cédula
-        <input type="file" id="pkg-foto-cedula" accept="image/*">
-      </label>
-      <img id="pkg-cedula-preview" class="pkg-preview hidden" alt="Vista previa de la cédula">
-      <p class="hint">Sin QR: la entrega se hará comparando la cédula. Administración verá la alerta para registrar al residente.</p>
+      <p class="hint">Llega por transportadora, así que no se pide cédula ahora. Al reclamar se coteja el nombre con la cédula y se registra el número.</p>
     </div>
     <label>Descripción (opcional)
       <input id="pkg-desc" maxlength="200" placeholder="Ej: caja Amazon, farmacia">
@@ -95,9 +88,9 @@
   <div id="pkg-entrega"></div>
 
   <h2>No registrado (entrega con cédula)</h2>
-  <p class="hint">Busca por cédula o nombre, compara a la persona con la foto de la cédula y marca la entrega:</p>
+  <p class="hint">Busca por nombre, compara el nombre con la cédula que presenta la persona, digita el número de cédula y marca la entrega:</p>
   <form id="tercero-form" class="form inline">
-    <input id="tercero-q" placeholder="Cédula o nombre" autocomplete="off">
+    <input id="tercero-q" placeholder="Nombre del destinatario" autocomplete="off">
     <button type="submit">Buscar</button>
   </form>
   <div id="tercero-resultados"></div>

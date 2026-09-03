@@ -65,11 +65,23 @@ function renderPaquete(j, box) {
 function renderTercero(p, box) {
   box.innerHTML =
     '<img src="' + p.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
-    (p.cedula_data_uri ? '<img src="' + p.cedula_data_uri + '" class="pkg-preview" alt="Foto de la cédula">' : '') +
-    '<p><strong>' + esc(p.nombre_tercero) + '</strong> · C.C. ' + esc(p.cedula_tercero) +
+    '<p><strong>' + esc(p.nombre_tercero) + '</strong>' +
     (p.description ? '<br>' + esc(p.description) : '') + '</p>' +
+    '<label>Cédula de quien reclama (se coteja el nombre con la cédula física)' +
+    '<input id="tercero-cedula" maxlength="30" inputmode="numeric" autocomplete="off"></label>' +
     '<button id="btn-entregar" type="button">Marcar entregado</button>';
-  enlazarEntregar(p.uuid, box, "Paquete entregado.");
+  document.getElementById("btn-entregar").addEventListener("click", async () => {
+    const cedula = document.getElementById("tercero-cedula").value.trim();
+    if (!cedula) { alert("Digita el número de cédula de quien reclama"); return; }
+    const r2 = await fetch("/api/packages/" + p.uuid + "/entregar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({cedula})});
+    const j2 = await r2.json();
+    if (r2.ok && j2.ok) {
+      box.innerHTML = '<p class="alert ok">Paquete entregado. Cédula registrada como evidencia.</p>';
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      box.innerHTML = '<p class="alert error">' + esc(j2.detail || "Error") + '</p>';
+    }
+  });
 }
 
 function enlazarEntregar(uuid, box, mensajeOk) {
@@ -128,7 +140,6 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
 // --- Paquetes ---------------------------------------------------------------
 
 let pkgFotoB64 = null;
-let pkgCedulaB64 = null;
 const pkgInput = document.getElementById("pkg-residente");
 const pkgResultados = document.getElementById("pkg-resultados");
 const pkgResidentId = document.getElementById("pkg-resident-id");
@@ -136,8 +147,6 @@ const pkgPreview = document.getElementById("pkg-preview");
 const pkgEsTercero = document.getElementById("pkg-es-tercero");
 const pkgBloqueResidente = document.getElementById("pkg-bloque-residente");
 const pkgBloqueTercero = document.getElementById("pkg-bloque-tercero");
-const pkgFotoCedula = document.getElementById("pkg-foto-cedula");
-const pkgCedulaPreview = document.getElementById("pkg-cedula-preview");
 let debounceId = null;
 
 pkgEsTercero.addEventListener("change", () => {
@@ -183,7 +192,6 @@ async function cargarFoto(input, preview, setter) {
 }
 
 document.getElementById("pkg-foto").addEventListener("change", e => cargarFoto(e.target, pkgPreview, b64 => { pkgFotoB64 = b64; }));
-pkgFotoCedula.addEventListener("change", e => cargarFoto(e.target, pkgCedulaPreview, b64 => { pkgCedulaB64 = b64; }));
 
 pkgInput.addEventListener("input", () => {
   pkgResidentId.value = "";
@@ -213,24 +221,19 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
   const okBox = document.getElementById("pkg-registro-ok");
   if (pkgEsTercero.checked) {
     const nombre = document.getElementById("pkg-tercero-nombre").value.trim();
-    const cedula = document.getElementById("pkg-tercero-cedula").value.trim();
-    if (!nombre || !cedula) { alert("Nombre y cédula del destinatario son obligatorios"); return; }
+    if (!nombre) { alert("Digita el nombre del destinatario (el de la etiqueta del paquete)"); return; }
     if (!pkgFotoB64) { alert("Toma la foto del paquete"); return; }
-    if (!pkgCedulaB64) { alert("Toma la foto de la cédula"); return; }
     const r = await fetch("/api/packages/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-      nombre, cedula,
+      nombre,
       description: document.getElementById("pkg-desc").value,
       photo_b64: pkgFotoB64,
-      cedula_b64: pkgCedulaB64,
     })});
     const j = await r.json();
     if (r.ok && j.ok) {
-      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong> (C.C. ' + esc(j.package.cedula_tercero) + '). Sin QR: se entrega comparando la cédula. Administración recibió la alerta.</p>';
+      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong>. Sin QR: al reclamar se coteja el nombre con la cédula. Administración recibió la alerta.</p>';
       e.target.reset();
       pkgFotoB64 = null;
-      pkgCedulaB64 = null;
       pkgPreview.classList.add("hidden");
-      pkgCedulaPreview.classList.add("hidden");
       pkgResidentId.value = "";
       pkgInput.value = "";
       pkgEsTercero.checked = false;
@@ -284,7 +287,7 @@ document.getElementById("tercero-form").addEventListener("submit", async e => {
     return;
   }
   resultados.innerHTML = j.paquetes.map(p =>
-    '<button type="button" class="small" data-tercero="' + p.uuid + '">' + esc(p.nombre_tercero) + " · C.C. " + esc(p.cedula_tercero) + (p.description ? " · " + esc(p.description) : "") + "</button>"
+    '<button type="button" class="small" data-tercero="' + p.uuid + '">' + esc(p.nombre_tercero) + (p.description ? " · " + esc(p.description) : "") + "</button>"
   ).join("");
   resultados.querySelectorAll("[data-tercero]").forEach(btn => btn.addEventListener("click", () => {
     const p = j.paquetes.find(x => x.uuid === btn.dataset.tercero);

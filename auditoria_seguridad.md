@@ -75,7 +75,7 @@ Para VIE el marco de referencia práctico es doble:
 - **Responsable del tratamiento**: el edificio (administración/consejo) que decide implementar VIE. VIE es la herramienta (encargado técnico).
 - **Datos tratados**: nombres y apellidos, usuario, clave (hasheada), cédula *opcional* del visitante, registro de entradas/salidas, fotos de paquetes.
 - Medidas alineadas: minimización (id opcional, visitantes sin cuenta), EXIF/GPS eliminado de fotos, retención de fotos 30 días post-entrega, acceso restringido por rol, base de propiedad de la administración.
-- **Dato sensible — fotos de cédula** (paquetes de no registrados): la cédula reemplaza al QR como prueba de identidad. Mismo tratamiento que las fotos de paquete (re-codificación sin EXIF, cap de tamaño) y mismo plazo de borrado (30 días tras entrega). El número de cédula solo es visible para guardas en la tarjeta de entrega y para administración en el Excel; queda en el registro como evidencia.
+- **Dato personal — cédula en paquetes de no registrados**: el paquete llega por transportadora, así que al registrar solo se anota el nombre del destinatario (el de la etiqueta). Al reclamar, el guarda coteja el nombre con la cédula física que presenta la persona y registra el **número de cédula como evidencia** de quién reclamó. No se almacenan fotos de cédulas. El número solo es visible para guardas en la tarjeta de entrega y para administración en el Excel.
 - **Pendiente del edificio**: aviso de privacidad en portería/recepción y autorización de tratamiento para visitantes (obligación legal del responsable, no del software).
 
 ## 8. Cómo verificar tú mismo

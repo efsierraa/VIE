@@ -73,8 +73,9 @@ class Package(Base):
     confirmed_at = Column(DateTime)
     photo_delete_after = Column(DateTime)  # la foto se borra sola 30 días tras la entrega
 
-    # Paquete para alguien sin cuenta en el sistema: la cédula reemplaza al QR
+    # Paquete para alguien sin cuenta: se registra con el nombre del destinatario
+    # (viene en la etiqueta). Al reclamar, se coteja el nombre con la cédula física
+    # y se guarda el número de cédula de quien reclamó como evidencia.
     tercero = Column(Boolean, default=False, nullable=False)
     nombre_tercero = Column(String(120))
-    cedula_tercero = Column(String(30), index=True)
-    foto_cedula = Column(LargeBinary)
+    cedula_tercero = Column(String(30), index=True)  # cédula de quien reclamó, al entregar

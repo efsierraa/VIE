@@ -579,20 +579,19 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
 
 
 def limpiar_fotos_vencidas(db: Session) -> int:
-    """Borra las fotos (paquete y cédula) cuyo plazo (30 días tras entrega) venció."""
+    """Borra las fotos cuyo plazo (30 días tras entrega) venció; el registro queda."""
     vencidos = (
         db.query(Package)
         .filter(
             Package.photo_delete_after.isnot(None),
             Package.photo_delete_after < utcnow(),
-            Package.photo.isnot(None) | Package.foto_cedula.isnot(None),
+            Package.photo.isnot(None),
         )
         .all()
     )
     for p in vencidos:
         p.photo = None
         p.photo_mime = None
-        p.foto_cedula = None
     if vencidos:
         db.commit()
     return len(vencidos)
@@ -721,10 +720,8 @@ def escanear_paquete(
 
 class PackageManualIn(BaseModel):
     nombre: str
-    cedula: str
     description: str | None = None
     photo_b64: str
-    cedula_b64: str
 
 
 @router.post("/packages/manual")
@@ -733,19 +730,18 @@ def registrar_paquete_tercero(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
-    """Paquete para alguien sin cuenta: nombre + cédula + foto de la cédula reemplazan al QR."""
+    """Paquete para alguien sin cuenta: llega por transportadora, solo se registra el
+    nombre del destinatario (el de la etiqueta). Al reclamar se coteja con su cédula."""
     nombre = data.nombre.strip()
-    cedula = data.cedula.strip()
-    if not nombre or not cedula:
-        raise HTTPException(400, "Nombre y cédula son obligatorios")
-    if len(nombre) > 120 or len(cedula) > 30:
-        raise HTTPException(400, "Nombre o cédula demasiado largos")
+    if not nombre:
+        raise HTTPException(400, "El nombre del destinatario es obligatorio")
+    if len(nombre) > 120:
+        raise HTTPException(400, "El nombre es demasiado largo")
     description = (data.description or "").strip() or None
     if description and len(description) > 200:
         raise HTTPException(400, "La descripción es demasiado larga")
     try:
         foto, mime = decodificar_foto(data.photo_b64)
-        foto_cedula, _ = decodificar_foto(data.cedula_b64)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -757,13 +753,11 @@ def registrar_paquete_tercero(
         photo_mime=mime,
         tercero=True,
         nombre_tercero=nombre,
-        cedula_tercero=cedula,
-        foto_cedula=foto_cedula,
     )
     db.add(pkg)
     db.commit()
     db.refresh(pkg)
-    log.info("paquete_tercero_registrado cedula=%s por=%s", cedula, guard.username)
+    log.info("paquete_tercero_registrado nombre=%s por=%s", nombre, guard.username)
     return {"ok": True, "package": package_dict(pkg)}
 
 
@@ -773,18 +767,21 @@ def buscar_paquetes_terceros(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
-    """Paquetes sin residente, en portería: buscar por cédula o nombre para entregar."""
+    """Paquetes sin residente, en portería: buscar por nombre del destinatario."""
     query = db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria")
     q = q.strip()
     if q:
-        like = f"%{q}%"
-        query = query.filter(or_(Package.cedula_tercero.ilike(like), Package.nombre_tercero.ilike(like)))
+        query = query.filter(Package.nombre_tercero.ilike(f"%{q}%"))
     pkgs = query.order_by(Package.created_at.desc()).limit(10).all()
-    return {"ok": True, "paquetes": [package_dict(p, include_photo=True, include_cedula=True) for p in pkgs]}
+    return {"ok": True, "paquetes": [package_dict(p, include_photo=True) for p in pkgs]}
 
 
 class AsignarIn(BaseModel):
     username: str
+
+
+class EntregarIn(BaseModel):
+    cedula: str | None = None  # para terceros: cédula de quien reclama (evidencia)
 
 
 @router.post("/packages/{package_uuid}/asignar")
@@ -820,6 +817,7 @@ def asignar_paquete(
 @router.post("/packages/{package_uuid}/entregar")
 def entregar_paquete(
     package_uuid: str,
+    data: EntregarIn | None = None,
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
@@ -828,12 +826,20 @@ def entregar_paquete(
         raise HTTPException(404, "Paquete no encontrado")
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    if pkg.tercero:
+        # la cédula de quien reclama queda como evidencia; se coteja el nombre con la etiqueta
+        cedula = (data.cedula or "").strip() if data else ""
+        if not cedula:
+            raise HTTPException(400, "Digita el número de cédula de quien reclama el paquete")
+        if len(cedula) > 30:
+            raise HTTPException(400, "Cédula demasiado larga")
+        pkg.cedula_tercero = cedula
     pkg.status = "entregado"
     pkg.delivered_at = utcnow()
     pkg.delivered_by = guard.id
     pkg.photo_delete_after = utcnow() + timedelta(days=DIAS_FOTO_ENTREGADA)
     db.commit()
-    log.info("paquete_entregado codigo=%s por=%s", pkg.short_code, guard.username)
+    log.info("paquete_entregado codigo=%s por=%s", pkg.short_code or pkg.nombre_tercero, guard.username)
     return {"ok": True, "package": package_dict(pkg)}
 
 

@@ -32,7 +32,6 @@ def _ensure_schema():
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero BOOLEAN DEFAULT 0 NOT NULL")
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN nombre_tercero VARCHAR(120)")
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN cedula_tercero VARCHAR(30)")
-            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN foto_cedula BLOB")
             conn.exec_driver_sql(
                 "CREATE INDEX IF NOT EXISTS ix_packages_cedula_tercero ON packages (cedula_tercero)"
             )
