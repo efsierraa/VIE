@@ -73,6 +73,9 @@ document.querySelectorAll("[data-pkgqr]").forEach(btn => btn.addEventListener("c
 }));
 
 document.querySelectorAll("[data-confirmar]").forEach(btn => btn.addEventListener("click", async () => {
+  const fila = btn.closest("tr");
+  const codigo = fila && fila.querySelector("strong") ? fila.querySelector("strong").textContent.trim() : "";
+  if (!confirm("¿Confirmas que recibiste el paquete " + codigo + "? Esta acción no se puede deshacer.")) return;
   const r = await fetch("/api/packages/" + btn.dataset.confirmar + "/confirmar", {method: "POST"});
   if (r.ok) location.reload();
   else { const j = await r.json(); alert(j.detail || "Error"); }
