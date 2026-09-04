@@ -121,13 +121,20 @@
     <tr>
       <td><strong>{{ item.p.short_code }}</strong></td>
       <td><span class="observacion" title="{{ item.p.description }}">{{ item.p.description or "—" }}</span></td>
-      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
       <td>{{ item.p.created_at|dt }}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>
         {% if item.p.status == "entregado" %}
         <button class="small" data-confirmar="{{ item.p.uuid }}">Confirmar recepción</button>
         <button class="small danger" data-disputar="{{ item.p.uuid }}">No lo recibí</button>
+        {% elif item.p.status == "disputa" %}
+          {% if item.p.resuelta_residente %}
+          <small class="auto">Registraste tu acuerdo; falta que portería/administración confirme</small>
+          {% else %}
+          <button class="small" data-resolver="{{ item.p.uuid }}">Resolver disputa</button>
+          {% if item.p.resuelta_porteria %}<br><small class="auto">Portería ya confirmó; falta tu aceptación</small>{% endif %}
+          {% endif %}
         {% endif %}
       </td>
     </tr>

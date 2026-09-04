@@ -57,6 +57,15 @@ def _ensure_schema():
         if col not in pkg_cols:
             with engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} VARCHAR(80)")
+    faltan_resolucion = {"resuelta_porteria", "resuelta_residente", "resuelta_at"} - pkg_cols
+    if faltan_resolucion:
+        falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
+        with engine.begin() as conn:
+            for col in faltan_resolucion:
+                if col == "resuelta_at":
+                    conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN resuelta_at TIMESTAMP")
+                else:
+                    conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} BOOLEAN DEFAULT {falso} NOT NULL")
 
 
 @asynccontextmanager

@@ -613,6 +613,9 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "delivered_at": p.delivered_at.isoformat() if p.delivered_at else None,
         "confirmed_at": p.confirmed_at.isoformat() if p.confirmed_at else None,
+        "resuelta_porteria": p.resuelta_porteria,
+        "resuelta_residente": p.resuelta_residente,
+        "resuelta_at": p.resuelta_at.isoformat() if p.resuelta_at else None,
         "photo_delete_after": p.photo_delete_after.isoformat() if p.photo_delete_after else None,
     }
     if include_photo and p.photo:
@@ -1204,7 +1207,46 @@ def disputar_paquete(
         raise HTTPException(400, "Solo se puede disputar un paquete entregado")
     pkg.status = "disputa"
     db.commit()
+    log.info("paquete_disputado uuid=%s por=%s", pkg.uuid, user.username)
     return {"ok": True, "package": package_dict(pkg)}
+
+
+@router.post("/packages/{package_uuid}/resolver")
+def resolver_disputa(
+    package_uuid: str,
+    user: User = Depends(require_api("residente", "guarda", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Resolución de una disputa a dos partes: portería (guarda o admin) y residente
+    deben aceptar. Cuando ambos confirman, el paquete queda como recibido."""
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if pkg.status != "disputa":
+        raise HTTPException(400, "Solo un paquete en disputa se puede resolver")
+
+    if user.role == "residente":
+        if pkg.resident_id != user.id:
+            raise HTTPException(403, "Solo el residente del paquete puede resolver su disputa")
+        if pkg.resuelta_residente:
+            raise HTTPException(400, "Ya confirmaste la resolución; falta la otra parte")
+        pkg.resuelta_residente = True
+        lado = "residente"
+    else:
+        if pkg.resuelta_porteria:
+            raise HTTPException(400, "Portería ya confirmó la resolución; falta el residente")
+        pkg.resuelta_porteria = True
+        lado = "portería"
+
+    _registrar_edicion(db, "paquete", pkg.uuid, user, [f"disputa: aceptada por {lado} ({user.username})"])
+    ambos = pkg.resuelta_porteria and pkg.resuelta_residente
+    if ambos:
+        pkg.status = "confirmado"
+        pkg.confirmed_at = utcnow()
+        pkg.resuelta_at = utcnow()
+        log.info("disputa_resuelta uuid=%s por=%s", pkg.uuid, user.username)
+    db.commit()
+    return {"ok": True, "resuelta": ambos, "package": package_dict(pkg)}
 
 
 @router.post("/users/{user_id}/toggle")

@@ -72,3 +72,16 @@ if (editPForm) {
     else alert(j.detail || "Error editando el paquete");
   });
 }
+
+// Resolución de disputas a dos partes (lado portería/administración)
+document.querySelectorAll("[data-resolver]").forEach(btn => btn.addEventListener("click", async () => {
+  if (!confirm("¿Confirmas que la disputa quedó resuelta? El residente también debe aceptar.")) return;
+  const r = await fetch("/api/packages/" + btn.dataset.resolver + "/resolver", {method: "POST"});
+  const j = await r.json();
+  if (r.ok && j.ok) {
+    alert(j.resuelta ? "Disputa resuelta: el paquete quedó confirmado." : "Tu acuerdo quedó registrado; falta que el residente confirme.");
+    location.reload();
+  } else {
+    alert(j.detail || "Error resolviendo la disputa");
+  }
+}));

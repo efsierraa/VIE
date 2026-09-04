@@ -92,6 +92,12 @@ class Package(Base):
     tower = Column(String(10))
     apartment = Column(String(10))
 
+    # Resolución de disputa a dos partes: portería (guarda o admin) y residente.
+    # El paquete pasa a confirmado solo cuando ambas aceptan.
+    resuelta_porteria = Column(Boolean, default=False, nullable=False)
+    resuelta_residente = Column(Boolean, default=False, nullable=False)
+    resuelta_at = Column(DateTime)
+
 
 class EditLog(Base):
     """Control de ediciones: qué cambió, quién y cuándo, en datos manuales."""

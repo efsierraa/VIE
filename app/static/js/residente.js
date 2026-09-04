@@ -96,6 +96,18 @@ document.querySelectorAll("[data-disputar]").forEach(btn => btn.addEventListener
   else { const j = await r.json(); alert(j.detail || "Error"); }
 }));
 
+document.querySelectorAll("[data-resolver]").forEach(btn => btn.addEventListener("click", async () => {
+  if (!confirm("¿Confirmas que la disputa quedó resuelta? La otra parte también debe aceptar.")) return;
+  const r = await fetch("/api/packages/" + btn.dataset.resolver + "/resolver", {method: "POST"});
+  const j = await r.json();
+  if (r.ok && j.ok) {
+    alert(j.resuelta ? "Disputa resuelta: el paquete quedó confirmado." : "Tu acuerdo quedó registrado; falta que la otra parte confirme.");
+    location.reload();
+  } else {
+    alert(j.detail || "Error resolviendo la disputa");
+  }
+}));
+
 document.getElementById("btn-copy").onclick = () => {
   navigator.clipboard.writeText(document.getElementById("short-code").textContent);
 };
