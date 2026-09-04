@@ -41,13 +41,13 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 BOGOTA = ZoneInfo("America/Bogota")
 
-HOME = {"admin": "/admin", "guarda": "/guarda", "residente": "/residente"}
+HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente"}
 templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
 
 NAVEGACION = {
     "guarda": [
-        ("ingresos", "/guarda", "Ingresos"),
         ("paquetes", "/guarda/paquetes", "Paquetes"),
+        ("ingresos", "/guarda", "Ingresos"),
     ],
     "admin": [
         ("inicio", "/admin", "Inicio"),

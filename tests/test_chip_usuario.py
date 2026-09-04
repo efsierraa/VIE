@@ -3,7 +3,7 @@ from conftest import login
 
 
 def test_chip_del_usuario_enlaza_al_inicio_por_rol(client):
-    esperados = {"residente1": "/residente", "guarda1": "/guarda", "admin1": "/admin"}
+    esperados = {"residente1": "/residente", "guarda1": "/guarda/paquetes", "admin1": "/admin"}
     for usuario, destino in esperados.items():
         login(client, usuario)
         page = client.get(destino).text
