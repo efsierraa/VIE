@@ -118,16 +118,25 @@ def test_guarda_reabre_qr_de_paquete_pendiente(client):
 
 
 def test_envio_whatsapp_condicional_al_celular(client):
+    """Solo con celular aparece el botón, y el envío va directo al chat del
+    número registrado (wa.me) con la imagen copiada para pegarla."""
     js = open("app/static/js/guarda_paquetes.js", encoding="utf-8").read()
     assert "if (j.package.tercero_celular)" in js  # solo con celular
-    assert "compartirPase(" in js
+    assert "enviarPaseWhatsapp(" in js
     js = open("app/static/js/residente.js", encoding="utf-8").read()
     assert "if (v.visitor_celular)" in js
-    assert "wa.me" not in js  # sin respaldo de solo-texto
+    assert "enviarPaseWhatsapp(" in js
+    assert "navigator.share" not in js  # ya no comparte a la hoja del sistema
+    js = open("app/static/js/guarda_ingresos.js", encoding="utf-8").read()
+    assert "enviarPaseWhatsapp(" in js
+
     app = open("app/static/app.js", encoding="utf-8").read()
-    assert "navigator.share({files: [archivo], text: texto})" in app  # imagen + texto juntos
-
-
+    assert "wa.me/" in app  # el chat del número registrado
+    assert "encodeURIComponent(texto)" in app
+    assert "ClipboardItem" in app  # la imagen viaja copiada para pegarla en el chat
+    assert "compartirPase" not in app  # la función anterior ya no existe
+    js = open("app/static/js/guarda_paquetes.js", encoding="utf-8").read()
+    assert "compartirPase" not in js
 def test_ver_qr_en_pendientes_con_tarjeta_de_pase(client):
     login(client, "guarda1")
     page = client.get("/guarda/paquetes").text

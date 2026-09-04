@@ -116,7 +116,7 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
       pkgEsTercero.dispatchEvent(new Event("change"));
       guiarA(okBox, true);
       if (j.package.tercero_celular) {
-        document.getElementById("btn-wa-tercero").addEventListener("click", () => compartirPase(j.qr_data_uri, texto, "paquete-vie-" + j.package.short_code + ".png"));
+        document.getElementById("btn-wa-tercero").addEventListener("click", () => enviarPaseWhatsapp(j.package.tercero_celular, j.qr_data_uri, texto, "paquete-vie-" + j.package.short_code + ".png"));
       }
     } else {
       okBox.innerHTML = '<p class="alert error">' + esc(j.detail || "Error registrando el paquete") + '</p>';
@@ -271,7 +271,7 @@ if (pkgPaseCard) {
     const wa = document.getElementById("pkg-pase-wa");
     if (btn.dataset.cel) {
       wa.classList.remove("hidden");
-      wa.onclick = () => compartirPase(j.qr_data_uri, texto, "paquete-vie-" + p.short_code + ".png");
+      wa.onclick = () => enviarPaseWhatsapp(btn.dataset.cel, j.qr_data_uri, texto, "paquete-vie-" + p.short_code + ".png");
     } else {
       wa.classList.add("hidden");
     }
