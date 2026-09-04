@@ -439,13 +439,28 @@ def cuenta_page(
 def admin_cuentas_page(
     request: Request,
     user: User = Depends(require_page("admin")),
+    q: str = "",
+    pagina: str = "1",
     db: Session = Depends(get_db),
 ):
-    users = db.query(User).order_by(User.role, User.username).all()
+    query = db.query(User).order_by(User.role, User.username)
+    if q.strip():
+        for token in q.strip().split():
+            like = f"%{token}%"
+            query = query.filter(
+                or_(User.username.ilike(like), User.nombres.ilike(like), User.apellidos.ilike(like))
+            )
+    users, u_ant, u_sig = paginar(query, _pagina(pagina), 50)
     return templates.TemplateResponse(
         request,
         "admin_cuentas.html",
-        {"user": user, "users": users, "tabs": nav_de("admin", "cuentas")},
+        {
+            "user": user,
+            "users": users,
+            "f_q": q,
+            "pager_u": pager(_pagina(pagina), u_ant, u_sig, "/admin/cuentas", {"q": q}, "pagina"),
+            "tabs": nav_de("admin", "cuentas"),
+        },
     )
 
 
@@ -548,6 +563,10 @@ def admin_historial_page(
     pkgs_map = {p.uuid: p for p in db.query(Package).filter(Package.uuid.in_(l_uuids))} if l_uuids else {}
     uid_residentes = {p.resident_id for p in pkgs_map.values() if not p.tercero and p.resident_id}
     res_map = {u.id: u.nombre_completo for u in db.query(User).filter(User.id.in_(uid_residentes))} if uid_residentes else {}
+    cuentas_map = {
+        u.username: u.nombre_completo
+        for u in db.query(User).filter(User.username.in_(l_uuids))
+    } if l_uuids else {}
 
     def _etiqueta_paquete(p: Package) -> str:
         if p.tercero:
@@ -558,10 +577,16 @@ def admin_historial_page(
             sufijo = f"código {p.short_code}" if p.short_code else "sin código"
         return f"Paquete de {nombre} ({sufijo})"
 
-    labels = {
-        u: ("Visita de " + v_map[u]) if u in v_map else (_etiqueta_paquete(pkgs_map[u]) if u in pkgs_map else "—")
-        for u in l_uuids
-    }
+    def _etiqueta_log(l: EditLog) -> str:
+        if l.entity_type == "usuario":
+            return f"Cuenta de {l.entity_uuid} — {cuentas_map.get(l.entity_uuid, '?')}"
+        if l.entity_uuid in v_map:
+            return "Visita de " + v_map[l.entity_uuid]
+        if l.entity_uuid in pkgs_map:
+            return _etiqueta_paquete(pkgs_map[l.entity_uuid])
+        return "—"
+
+    labels = {l.entity_uuid: _etiqueta_log(l) for l in logs}
 
     return templates.TemplateResponse(
         request,

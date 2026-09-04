@@ -42,7 +42,13 @@
 
 <section class="card">
   <h2>Cuentas</h2>
+  <form method="get" action="/admin/cuentas" class="form inline">
+    <input name="q" value="{{ f_q }}" placeholder="Nombre o usuario" autocomplete="off">
+    <button type="submit">Buscar</button>
+    {% if f_q %}<a class="small" href="/admin/cuentas">Limpiar</a>{% endif %}
+  </form>
   <div class="table-wrap">
+  {% if users %}
   <table>
     <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Torre · Apto</th><th>Celular</th><th>Estado</th><th></th></tr></thead>
     <tbody>
@@ -55,6 +61,7 @@
       <td>{{ u.celular or "—" }}</td>
       <td>{% if u.active %}<span class="chip status-dentro">activa</span>{% else %}<span class="chip status-cancelada">inactiva</span>{% endif %}</td>
       <td>
+        <button class="small" data-editar-cuenta="{{ u.id }}" data-usuario="{{ u.username }}" data-nombres="{{ u.nombres }}" data-apellidos="{{ u.apellidos }}" data-cel="{{ u.celular or '' }}" data-torre="{{ u.tower or '' }}" data-apto="{{ u.apartment or '' }}">Editar</button>
         {% if u.id != user.id %}
         <button class="small" data-reset="{{ u.id }}" data-nombre="{{ u.nombre_completo }}">Clave</button>
         <button class="small" data-toggle="{{ u.id }}">{{ "Desactivar" if u.active else "Activar" }}</button>
@@ -64,8 +71,35 @@
     {% endfor %}
     </tbody>
   </table>
+  {% else %}
+  <p class="hint">Sin cuentas que coincidan con la búsqueda.</p>
+  {% endif %}
   </div>
-  <p class="hint">"Clave" asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar).</p>
+  {% if pager_u.anterior or pager_u.siguiente %}
+  <p class="paginador">
+    {% if pager_u.anterior %}<a class="small" href="{{ pager_u.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_u.pagina }}</span>
+    {% if pager_u.siguiente %}<a class="small" href="{{ pager_u.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
+  <p class="hint">"Editar" corrige nombres, celular y destino. "Clave" asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar). El usuario y el rol no se editan.</p>
+</section>
+
+<section id="edit-cuenta-card" class="card hidden">
+  <h2>Editar cuenta de <span id="edit-c-usuario"></span></h2>
+  <form id="edit-cuenta-form" class="form">
+    <div class="row">
+      <label>Nombres <input id="edit-c-nombres" required maxlength="80"></label>
+      <label>Apellidos <input id="edit-c-apellidos" required maxlength="80"></label>
+    </div>
+    <label>Celular (opcional) <input id="edit-c-cel" maxlength="20" inputmode="tel"></label>
+    <div class="row">
+      <label>Torre <input id="edit-c-torre" maxlength="10"></label>
+      <label>Apartamento <input id="edit-c-apto" maxlength="10"></label>
+    </div>
+    <p class="hint">Un residente requiere torre y apartamento. Toda edición queda registrada en el control de ediciones.</p>
+    <button type="submit">Guardar cambios</button>
+  </form>
 </section>
 {% endblock %}
 

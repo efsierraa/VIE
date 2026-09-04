@@ -18,6 +18,36 @@ form.addEventListener("submit", async e => {
   else alert(j.detail || "Error creando la cuenta");
 });
 
+// Edición de cuentas: nombres, celular, torre y apto (el usuario y el rol no se tocan)
+const editCuentaCard = document.getElementById("edit-cuenta-card");
+const editCuentaForm = document.getElementById("edit-cuenta-form");
+if (editCuentaCard && editCuentaForm) {
+  document.querySelectorAll("[data-editar-cuenta]").forEach(btn => btn.addEventListener("click", () => {
+    editCuentaForm.dataset.id = btn.dataset.editarCuenta;
+    document.getElementById("edit-c-usuario").textContent = btn.dataset.usuario;
+    document.getElementById("edit-c-nombres").value = btn.dataset.nombres || "";
+    document.getElementById("edit-c-apellidos").value = btn.dataset.apellidos || "";
+    document.getElementById("edit-c-cel").value = btn.dataset.cel || "";
+    document.getElementById("edit-c-torre").value = btn.dataset.torre || "";
+    document.getElementById("edit-c-apto").value = btn.dataset.apto || "";
+    editCuentaCard.classList.remove("hidden");
+    editCuentaCard.scrollIntoView({behavior: "smooth"});
+  }));
+  editCuentaForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await fetch("/api/users/" + editCuentaForm.dataset.id + "/editar", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+      nombres: document.getElementById("edit-c-nombres").value.trim(),
+      apellidos: document.getElementById("edit-c-apellidos").value.trim(),
+      celular: document.getElementById("edit-c-cel").value,
+      tower: document.getElementById("edit-c-torre").value,
+      apartment: document.getElementById("edit-c-apto").value,
+    })});
+    const j = await r.json();
+    if (r.ok && j.ok) location.reload();
+    else alert(j.detail || "Error editando la cuenta");
+  });
+}
+
 document.querySelectorAll("[data-toggle]").forEach(btn => btn.addEventListener("click", async e => {
   e.preventDefault();
   const fila = btn.closest("tr");

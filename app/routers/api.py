@@ -508,6 +508,64 @@ def actualizar_perfil(
     return {"ok": True, "celular": user.celular}
 
 
+class EditarCuentaIn(BaseModel):
+    nombres: str
+    apellidos: str
+    celular: str | None = None  # opcional
+    tower: str | None = None
+    apartment: str | None = None
+
+
+@router.patch("/users/{user_id}/editar")
+def editar_cuenta(
+    user_id: int,
+    data: EditarCuentaIn,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Administración corrige una cuenta: nombres, apellidos, celular, torre y apartamento.
+
+    El usuario y el rol no se tocan (son la identidad); la clave y el estado tienen
+    sus propios controles. Toda edición queda en el control de ediciones."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "Cuenta no encontrada")
+
+    nombres = data.nombres.strip()
+    apellidos = data.apellidos.strip()
+    if not nombres or not apellidos:
+        raise HTTPException(400, "Nombres y apellidos son obligatorios")
+    if len(nombres) > 80 or len(apellidos) > 80:
+        raise HTTPException(400, "Nombres o apellidos demasiado largos")
+    tower = (data.tower or "").strip().upper() or None
+    apartment = (data.apartment or "").strip() or None
+    if user.role == "residente" and not (tower and apartment):
+        raise HTTPException(400, "Un residente requiere torre y apartamento")
+    celular = normalizar_celular(data.celular)
+
+    cambios = []
+    pares = (
+        ("nombres", user.nombres, nombres),
+        ("apellidos", user.apellidos, apellidos),
+        ("celular", user.celular, celular),
+        ("torre", user.tower, tower),
+        ("apto", user.apartment, apartment),
+    )
+    for etiqueta, antes, despues in pares:
+        if (antes or "") != (despues or ""):
+            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues or ''}'")
+
+    user.nombres = nombres
+    user.apellidos = apellidos
+    user.celular = celular
+    user.tower = tower
+    user.apartment = apartment
+    _registrar_edicion(db, "usuario", user.username, admin, cambios)
+    db.commit()
+    log.info("cuenta_editada username=%s por=%s campos=%s", user.username, admin.username, len(cambios))
+    return {"ok": True, "message": "Cuenta actualizada"}
+
+
 @router.post("/users/csv")
 async def import_users_csv(
     file: UploadFile = File(...),
