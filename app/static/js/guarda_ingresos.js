@@ -50,7 +50,7 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
       "Código para portería: " + v.short_code + "\n" +
       "Vigente 1 hora. Un solo uso.";
     const btnWa = v.visitor_celular
-      ? '<a class="button" target="_blank" rel="noopener" href="https://wa.me/' + v.visitor_celular + '?text=' + encodeURIComponent(texto) + '">Enviar por WhatsApp</a>'
+      ? '<button type="button" class="button" id="btn-wa-manual">Enviar por WhatsApp</button>'
       : "";
     show('<p class="alert ok">' + esc(j.message) + '. Entrega el pase al visitante:</p>' +
       '<div class="qr-box"><img src="' + j.qr_data_uri + '" alt="QR del pase"></div>' +
@@ -58,6 +58,9 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
       '<p class="hint">El pase es válido por 1 hora: sirve para marcar la salida y, si nadie la marca, se marca sola al vencer. Para visitas más largas, un residente debe registrarlo.</p>' +
       '<div class="row">' + btnWa + '<a class="button" download="pase-vie-' + esc(v.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a><button type="button" id="btn-listo">Listo</button></div>');
     e.target.reset();
+    if (v.visitor_celular) {
+      document.getElementById("btn-wa-manual").addEventListener("click", () => compartirPase(j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png"));
+    }
     document.getElementById("btn-listo").addEventListener("click", () => location.reload());
   } else {
     show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
@@ -84,8 +87,8 @@ if (paseCard) {
         "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
         "Código para portería: " + v.short_code + "\n" +
         "Un solo uso.";
-      wa.href = "https://wa.me/" + v.visitor_celular + "?text=" + encodeURIComponent(texto);
       wa.classList.remove("hidden");
+      wa.onclick = () => compartirPase(j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png");
     } else {
       wa.classList.add("hidden");
     }

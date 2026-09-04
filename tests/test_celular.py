@@ -240,11 +240,13 @@ def test_excel_incluye_columna_celular(client):
 
 
 def test_botones_whatsapp_solo_con_celular(client):
-    """La lógica condicional vive en el JS: verifica los datos que la alimentan."""
+    """La lógica condicional vive en el JS: verifica los datos que la alimentan.
+    El envío unificado usa compartirPase (imagen + texto) — sin wa.me de solo texto."""
     js = open("app/static/js/guarda_ingresos.js", encoding="utf-8").read()
-    assert "wa.me/" in js
     assert "if (v.visitor_celular)" in js
+    assert "wa.me" not in js
 
     js = open("app/static/js/residente.js", encoding="utf-8").read()
-    assert "wa.me/" in js
     assert "if (v.visitor_celular)" in js
+    assert "compartirPase(" in js
+    assert "wa.me" not in js

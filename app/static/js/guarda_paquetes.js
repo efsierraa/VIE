@@ -97,7 +97,16 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
     })});
     const j = await r.json();
     if (r.ok && j.ok) {
-      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong> · T' + esc(j.package.tower) + ' · ' + esc(j.package.apartment) + '. Sin QR: al reclamar se coteja el nombre con la cédula. Administración recibió la alerta.</p>';
+      okBox.innerHTML = '<p class="alert ok">Paquete registrado para <strong>' + esc(j.package.nombre_tercero) + '</strong> · T' + esc(j.package.tower) + ' · ' + esc(j.package.apartment) + '. Al reclamar se coteja el nombre con la cédula. Administración recibió la alerta.</p>';
+      const texto = "Tienes un paquete en portería (VIE)\n" +
+        "Destinatario: " + j.package.nombre_tercero + "\n" +
+        "Código: " + j.package.short_code + "\n" +
+        "Presenta este QR y tu cédula para reclamarlo.";
+      let btnWa = "";
+      if (j.package.tercero_celular) {
+        btnWa = '<button type="button" class="button" id="btn-wa-tercero">Enviar por WhatsApp</button>';
+      }
+      okBox.innerHTML += '<div class="qr-box"><img src="' + j.qr_data_uri + '" alt="QR de reclamo"></div><div class="row">' + btnWa + '<a class="button" download="paquete-vie-' + esc(j.package.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a></div>';
       e.target.reset();
       pkgFotoB64 = null;
       pkgPreview.classList.add("hidden");
@@ -106,6 +115,9 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
       pkgEsTercero.checked = false;
       pkgEsTercero.dispatchEvent(new Event("change"));
       guiarA(okBox, true);
+      if (j.package.tercero_celular) {
+        document.getElementById("btn-wa-tercero").addEventListener("click", () => compartirPase(j.qr_data_uri, texto, "paquete-vie-" + j.package.short_code + ".png"));
+      }
     } else {
       okBox.innerHTML = '<p class="alert error">' + esc(j.detail || "Error registrando el paquete") + '</p>';
       guiarA(okBox, false);
@@ -148,7 +160,11 @@ function buscarPaquete(payload) {
     .then(r => r.json())
     .then(j => {
       if (!j.ok) { box.innerHTML = '<p class="alert error">' + esc(j.detail || "Error") + '</p>'; return; }
-      renderPaquete(j, box);
+      if (j.package.tercero) {
+        renderTercero(j.package, box);  // reclamo con cédula: la foto ayuda a cotejar
+      } else {
+        renderPaquete(j, box);
+      }
     })
     .catch(() => { box.innerHTML = '<p class="alert error">Error de conexión</p>'; });
 }
@@ -235,3 +251,32 @@ document.querySelectorAll("[data-resolver]").forEach(btn => btn.addEventListener
     alert(j.detail || "Error resolviendo la disputa");
   }
 }));
+
+// Ver y reenviar el QR de reclamo de un paquete en portería
+const pkgPaseCard = document.getElementById("pkg-pase-card");
+if (pkgPaseCard) {
+  document.querySelectorAll("[data-verqr-pkg]").forEach(btn => btn.addEventListener("click", async () => {
+    const r = await fetch("/api/packages/" + btn.dataset.verqrPkg + "/pass");
+    const j = await r.json();
+    if (!(r.ok && j.ok)) { alert(j.detail || "No se pudo abrir el QR"); return; }
+    const p = j.package;
+    const texto = "Tienes un paquete en portería (VIE)\n" +
+      "Destinatario: " + btn.dataset.nombre + "\n" +
+      "Código: " + p.short_code + "\n" +
+      "Presenta este QR y tu cédula para reclamarlo.";
+    document.getElementById("pkg-pase-img").src = j.qr_data_uri;
+    document.getElementById("pkg-pase-codigo").textContent = p.short_code;
+    document.getElementById("pkg-pase-descargar").href = j.qr_data_uri;
+    document.getElementById("pkg-pase-descargar").download = "paquete-vie-" + p.short_code + ".png";
+    const wa = document.getElementById("pkg-pase-wa");
+    if (btn.dataset.cel) {
+      wa.classList.remove("hidden");
+      wa.onclick = () => compartirPase(j.qr_data_uri, texto, "paquete-vie-" + p.short_code + ".png");
+    } else {
+      wa.classList.add("hidden");
+    }
+    pkgPaseCard.classList.remove("hidden");
+    pkgPaseCard.scrollIntoView({behavior: "smooth"});
+  }));
+  document.getElementById("pkg-pase-listo").addEventListener("click", () => pkgPaseCard.classList.add("hidden"));
+}

@@ -225,7 +225,7 @@ def test_paquete_tercero_flujo(client):
     assert r.status_code == 200, r.json()
     pkg = r.json()["package"]
     assert pkg["tercero"] is True
-    assert pkg["short_code"] is None  # sin QR: la cédula es la llave
+    assert pkg["short_code"]  # QR de reclamo: la cédula sigue siendo la llave de la entrega
     assert pkg["tower"] == "4" and pkg["apartment"] == "1005"  # todo paquete tiene destino
     assert pkg["cedula_tercero"] is None  # la cédula se registra solo al reclamar
 
@@ -314,7 +314,7 @@ def test_asignar_paquete_tercero_ya_entregado(client):
     assert r.status_code == 200
     j = r.json()["package"]
     assert j["tercero"] is False
-    assert j["short_code"] is None  # ya entregado: sin QR, solo el registro vinculado
+    assert j["short_code"]  # conserva su código; ya no tiene QR (entregado)
     assert j["cedula_tercero"] == "44332211"  # la evidencia del reclamo se conserva
 
     # aparece en el historial ya vinculado: dueña real y evidencia de la cédula del reclamo

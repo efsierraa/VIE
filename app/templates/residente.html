@@ -27,7 +27,7 @@
       <label>Nombres <input name="visitor_nombres" required maxlength="80" placeholder="Ej: Juan, María"></label>
       <label>Apellidos <input name="visitor_apellidos" required maxlength="80" placeholder="Ej: Pérez Gómez"></label>
     </div>
-    <label>Asunto <input name="subject" required placeholder="Ej: visita familiar, entrega de domo"></label>
+    <label>Asunto <input name="subject" required placeholder="Ej: visita familiar, entrega a domicilio"></label>
     <label>Identificación (opcional) <input name="id_number" placeholder="Cédula"></label>
     <label>Celular del visitante (opcional) <input name="visitor_celular" inputmode="tel" placeholder="Ej: 300 123 4567 — activa el envío por WhatsApp"></label>
     <label>Rol
@@ -65,10 +65,8 @@
     <code id="token" class="token"></code>
   </details>
   <div class="row">
-    <button id="btn-share" type="button">Compartir por WhatsApp</button>
-    <a id="btn-wa" class="button hidden" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+    <button id="btn-wa" type="button" class="hidden">Enviar por WhatsApp</button>
     <a id="btn-download" class="button" download="pase-vie.png">Descargar QR</a>
-    <button id="btn-copy" type="button">Copiar código corto</button>
   </div>
 </section>
 

@@ -2,15 +2,6 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const form = document.getElementById("visit-form");
 const result = document.getElementById("result");
 
-function dataUriToFile(dataUri, filename) {
-  const [meta, b64] = dataUri.split(",");
-  const mime = meta.match(/data:(.*?);/)[1];
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new File([bytes], filename, {type: mime});
-}
-
 function mostrarPase(j) {
   document.getElementById("qr-img").src = j.qr_data_uri;
   document.getElementById("token").textContent = j.token;
@@ -32,34 +23,14 @@ function mostrarPase(j) {
     "Un solo uso.";
   const wa = document.getElementById("btn-wa");
   if (v.visitor_celular) {
-    wa.href = "https://wa.me/" + v.visitor_celular + "?text=" + encodeURIComponent(text);
     wa.classList.remove("hidden");
+    wa.onclick = () => compartirPase(j.qr_data_uri, text, "pase-vie-" + v.short_code + ".png");
   } else {
     wa.classList.add("hidden");
   }
   const dl = document.getElementById("btn-download");
   dl.href = j.qr_data_uri;
   dl.download = "pase-vie-" + j.visit.short_code + ".png";
-  document.getElementById("btn-share").onclick = async () => {
-    let compartido = false;
-    try {
-      const file = dataUriToFile(j.qr_data_uri, "pase-vie-" + v.short_code + ".png");
-      if (navigator.canShare && navigator.canShare({files: [file]})) {
-        await navigator.share({files: [file], title: "Pase VIE", text});
-        compartido = true;
-      }
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-    }
-    if (compartido) return;
-    try {
-      await navigator.share({title: "Pase VIE", text});
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-      navigator.clipboard.writeText(text);
-      alert("Tu navegador no permite compartir la imagen desde aquí. Descarga el QR, adjúntalo en WhatsApp y pega el texto (ya quedó copiado).");
-    }
-  };
   result.classList.remove("hidden");
   result.scrollIntoView({behavior: "smooth"});
 }
@@ -114,10 +85,6 @@ document.querySelectorAll("[data-resolver]").forEach(btn => btn.addEventListener
     alert(j.detail || "Error resolviendo la disputa");
   }
 }));
-
-document.getElementById("btn-copy").onclick = () => {
-  navigator.clipboard.writeText(document.getElementById("short-code").textContent);
-};
 
 document.querySelectorAll("[data-cancel]").forEach(btn => btn.addEventListener("click", async () => {
   const fila = btn.closest("tr");

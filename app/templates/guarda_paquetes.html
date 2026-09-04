@@ -16,7 +16,7 @@
       <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
-      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
+      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %} <button class="small" data-verqr-pkg="{{ item.p.uuid }}" data-nombre="{{ item.destinatario }}" data-cel="{{ item.celular }}">Ver QR</button></td>
     </tr>
     {% endfor %}
     </tbody>
@@ -148,6 +148,18 @@
     <p class="hint">Puedes editar durante 1 hora desde el registro. Toda edición queda registrada.</p>
     <button type="submit">Guardar cambios</button>
   </form>
+</section>
+
+<section id="pkg-pase-card" class="card hidden">
+  <h2>QR de reclamo del paquete</h2>
+  <div class="qr-box"><img id="pkg-pase-img" alt="QR del paquete"></div>
+  <p class="short-code">Código: <strong id="pkg-pase-codigo"></strong></p>
+  <p class="hint">Muéstralo o reenvíalo mientras el paquete esté en portería. Al reclamar se cotejan nombres y apellidos con la cédula.</p>
+  <div class="row">
+    <button id="pkg-pase-wa" type="button" class="hidden">Enviar por WhatsApp</button>
+    <a id="pkg-pase-descargar" class="button" download="paquete-vie.png">Descargar QR</a>
+    <button id="pkg-pase-listo" type="button">Listo</button>
+  </div>
 </section>
 {% endblock %}
 

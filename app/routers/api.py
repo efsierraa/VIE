@@ -11,6 +11,7 @@ from uuid import uuid4
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
+from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -56,6 +57,29 @@ def qr_data_uri(text: str) -> str:
     img = qrcode.make(text, box_size=6, border=2)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+def qr_pase_data_uri(token: str, lineas: list[str]) -> str:
+    """QR del pase con leyenda incrustada debajo: la imagen sola identifica el pase
+    (código corto y de quién es) — imprescindible al compartir por WhatsApp."""
+    qr = qrcode.make(token, box_size=6, border=2).convert("RGB")
+    ancho = qr.width
+    alto_leyenda = 28 * len(lineas) + 14
+    lienzo = Image.new("RGB", (ancho, qr.height + alto_leyenda), "white")
+    lienzo.paste(qr, (0, 0))
+    dibujo = ImageDraw.Draw(lienzo)
+    try:
+        fuente = ImageFont.truetype("DejaVuSans-Bold.ttf", 19)
+    except OSError:
+        fuente = ImageFont.load_default()
+    y = qr.height + 8
+    for linea in lineas:
+        caja = dibujo.textbbox((0, 0), linea, font=fuente)
+        dibujo.text(((ancho - (caja[2] - caja[0])) // 2, y), linea, fill="black", font=fuente)
+        y += 28
+    buf = io.BytesIO()
+    lienzo.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
@@ -260,7 +284,12 @@ def create_visit(
     db.refresh(visit)
 
     token = sign_visit(visit.uuid)
-    return {"ok": True, "token": token, "qr_data_uri": qr_data_uri(token), "visit": visit_dict(visit)}
+    return {
+        "ok": True,
+        "token": token,
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}"]),
+        "visit": visit_dict(visit),
+    }
 
 
 @router.get("/visits/mine")
@@ -310,7 +339,12 @@ def visit_pass(
     if visit.status not in ("pendiente", "dentro"):
         raise HTTPException(400, "Este pase ya fue usado o cancelado")
     token = sign_visit(visit.uuid)
-    return {"ok": True, "token": token, "qr_data_uri": qr_data_uri(token), "visit": visit_dict(visit)}
+    return {
+        "ok": True,
+        "token": token,
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}"]),
+        "visit": visit_dict(visit),
+    }
 
 
 # --- Guarda ---------------------------------------------------------------
@@ -402,6 +436,9 @@ def escanear_qr(
             raise HTTPException(400, "QR inválido o alterado")
         if pkg.status != "en_porteria":
             raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+        if pkg.tercero:
+            # el QR del tercero abre el reclamo con cédula: la foto ayuda a cotejar
+            return {"tipo": "paquete", "ok": True, "package": package_dict(pkg, include_photo=True)}
         residente = db.get(User, pkg.resident_id)
         return {
             "tipo": "paquete",
@@ -461,7 +498,7 @@ def manual_entry(
         "ok": True,
         "message": "Entrada manual registrada",
         "token": token,
-        "qr_data_uri": qr_data_uri(token),
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}", "Vigente 1 hora"]),
         "visit": visit_dict(visit),
     }
 
@@ -920,7 +957,8 @@ def escanear_paquete(
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
     if pkg.tercero:
-        raise HTTPException(400, "Este paquete no tiene QR: búscalo por cédula o nombre en la sección de no registrados")
+        # el QR del tercero abre el reclamo con cédula: la foto ayuda a cotejar
+        return {"ok": True, "package": package_dict(pkg, include_photo=True)}
     residente = db.get(User, pkg.resident_id)
     return {
         "ok": True,
@@ -1133,6 +1171,7 @@ def registrar_paquete_tercero(
 
     pkg = Package(
         uuid=str(uuid4()),
+        short_code=_codigo_unico(db, Package),
         resident_id=guard.id,  # placeholder hasta que administración asigne un residente
         description=description,
         photo=foto,
@@ -1149,7 +1188,12 @@ def registrar_paquete_tercero(
     db.commit()
     db.refresh(pkg)
     log.info("paquete_tercero_registrado nombre=%s por=%s", nombre, guard.username)
-    return {"ok": True, "package": package_dict(pkg)}
+    token = sign_package(pkg.uuid)
+    qr = qr_pase_data_uri(
+        token,
+        [f"Código: {pkg.short_code}", f"Paquete de: {nombre}", f"T{tower} · {apartment}"],
+    )
+    return {"ok": True, "token": token, "qr_data_uri": qr, "package": package_dict(pkg)}
 
 
 @router.get("/packages/terceros")
@@ -1281,7 +1325,10 @@ def mis_paquetes(user: User = Depends(require_api("residente")), db: Session = D
         if p.status == "en_porteria":
             if p.photo:
                 d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
-            d["qr_data_uri"] = qr_data_uri(sign_package(p.uuid))
+            d["qr_data_uri"] = qr_pase_data_uri(
+                sign_package(p.uuid),
+                [f"Código: {p.short_code}", f"Paquete de: {user.nombre_completo}"],
+            )
         out.append(d)
     pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
     return {"ok": True, "pendientes": pendientes, "packages": out}
@@ -1290,18 +1337,28 @@ def mis_paquetes(user: User = Depends(require_api("residente")), db: Session = D
 @router.get("/packages/{package_uuid}/pass")
 def paquete_pass(
     package_uuid: str,
-    user: User = Depends(require_api("residente")),
+    user: User = Depends(require_api("residente", "guarda", "admin")),
     db: Session = Depends(get_db),
 ):
+    """QR de reclamo del paquete. El residente ve el suyo; el guarda y administración
+    pueden re-mostrar el de cualquier paquete en portería (p. ej. perdido el WhatsApp)."""
     pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
-    if pkg is None or pkg.resident_id != user.id:
+    if pkg is None:
+        raise HTTPException(404, "Paquete no encontrado")
+    if user.role == "residente" and pkg.resident_id != user.id:
         raise HTTPException(404, "Paquete no encontrado")
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    token = sign_package(pkg.uuid)
+    if pkg.tercero:
+        lineas = [f"Código: {pkg.short_code}", f"Paquete de: {pkg.nombre_tercero}", f"T{pkg.tower} · {pkg.apartment}"]
+    else:
+        residente = db.get(User, pkg.resident_id)
+        lineas = [f"Código: {pkg.short_code}", f"Paquete de: {residente.nombre_completo if residente else '—'}"]
     return {
         "ok": True,
-        "token": sign_package(pkg.uuid),
-        "qr_data_uri": qr_data_uri(sign_package(pkg.uuid)),
+        "token": token,
+        "qr_data_uri": qr_pase_data_uri(token, lineas),
         "package": package_dict(pkg, include_photo=True),
     }
 

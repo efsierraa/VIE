@@ -25,7 +25,7 @@ async function submitScan(payload) {
   if (r.ok && j.ok) {
     const v = j.visit;
     const quien = v.visitor_nombres
-      ? '<strong>Nombres: ' + esc(v.visitor_nombres) + '</strong> · Apellidos: ' + esc(v.visitor_apellidos) + ' (' + esc(v.visitor_role) + ')'
+      ? 'Nombres: ' + esc(v.visitor_nombres) + ' · <strong>Apellidos: ' + esc(v.visitor_apellidos) + '</strong> (' + esc(v.visitor_role) + ')'
       : '<strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')';
     show('<p class="alert ok">' + esc(j.message) + '</p>' +
       '<p>' + quien + '<br>' +
@@ -46,13 +46,17 @@ async function enviarCamara(token) {
     return;
   }
   if (j.tipo === "paquete") {
-    renderPaquete(j, resultBody);
+    if (j.package.tercero) {
+      renderTercero(j.package, resultBody);  // reclamo con cédula: la foto ayuda a cotejar
+    } else {
+      renderPaquete(j, resultBody);
+    }
     resultCard.classList.remove("hidden");
     guiarA(resultCard, true);
   } else {
     const v = j.visit;
     const quien = v.visitor_nombres
-      ? '<strong>Nombres: ' + esc(v.visitor_nombres) + '</strong> · Apellidos: ' + esc(v.visitor_apellidos) + ' (' + esc(v.visitor_role) + ')'
+      ? 'Nombres: ' + esc(v.visitor_nombres) + ' · <strong>Apellidos: ' + esc(v.visitor_apellidos) + '</strong> (' + esc(v.visitor_role) + ')'
       : '<strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')';
     show('<p class="alert ok">' + esc(j.message) + '</p>' +
       '<p>' + quien + '<br>' +
@@ -78,7 +82,7 @@ function renderPaquete(j, box) {
 
 function renderTercero(p, box) {
   const quien = p.tercero_nombres
-    ? '<strong>Nombres: ' + esc(p.tercero_nombres) + '</strong> · Apellidos: ' + esc(p.tercero_apellidos)
+    ? 'Nombres: ' + esc(p.tercero_nombres) + ' · <strong>Apellidos: ' + esc(p.tercero_apellidos) + '</strong>'
     : '<strong>' + esc(p.nombre_tercero) + '</strong>';
   const nombreCompleto = p.tercero_nombres ? p.tercero_nombres + " " + p.tercero_apellidos : p.nombre_tercero;
   box.innerHTML =
