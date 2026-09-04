@@ -524,9 +524,21 @@ def admin_historial_page(
     pager_ed = pager(_pagina(pagina_ed), ed_ant, ed_sig, "/admin/historial", {"tipo": tipo}, "pagina_ed")
     l_uuids = {l.entity_uuid for l in logs}
     v_map = {v.uuid: v.visitor_name for v in db.query(Visit).filter(Visit.uuid.in_(l_uuids))} if l_uuids else {}
-    p_map = {p.uuid: p.nombre_tercero for p in db.query(Package).filter(Package.uuid.in_(l_uuids))} if l_uuids else {}
+    pkgs_map = {p.uuid: p for p in db.query(Package).filter(Package.uuid.in_(l_uuids))} if l_uuids else {}
+    uid_residentes = {p.resident_id for p in pkgs_map.values() if not p.tercero and p.resident_id}
+    res_map = {u.id: u.nombre_completo for u in db.query(User).filter(User.id.in_(uid_residentes))} if uid_residentes else {}
+
+    def _etiqueta_paquete(p: Package) -> str:
+        if p.tercero:
+            nombre = p.nombre_tercero or "sin nombre en la etiqueta"
+            sufijo = "no registrado"
+        else:
+            nombre = res_map.get(p.resident_id) or "residente sin asignar"
+            sufijo = f"código {p.short_code}" if p.short_code else "sin código"
+        return f"Paquete de {nombre} ({sufijo})"
+
     labels = {
-        u: ("Visita de " + v_map[u]) if u in v_map else ("Paquete de " + (p_map.get(u) or "?"))
+        u: ("Visita de " + v_map[u]) if u in v_map else (_etiqueta_paquete(pkgs_map[u]) if u in pkgs_map else "—")
         for u in l_uuids
     }
 

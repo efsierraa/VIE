@@ -905,8 +905,8 @@ def editar_visita(
         ("apto", visit.apartment, apartment),
     )
     for etiqueta, antes, despues in pares:
-        if (antes or "") != despues:
-            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues}'")
+        if (antes or "") != (despues or ""):
+            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues or ''}'")
 
     visit.visitor_nombres = nombres
     visit.visitor_apellidos = apellidos
@@ -961,8 +961,8 @@ def editar_paquete(
         ("descripción", pkg.description, description),
     )
     for etiqueta, antes, despues in pares:
-        if (antes or "") != despues:
-            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues}'")
+        if (antes or "") != (despues or ""):
+            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues or ''}'")
 
     pkg.tercero_nombres = nombres
     pkg.tercero_apellidos = apellidos
