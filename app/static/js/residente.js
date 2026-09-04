@@ -24,7 +24,7 @@ function mostrarPase(j) {
   const wa = document.getElementById("btn-wa");
   if (v.visitor_celular) {
     wa.classList.remove("hidden");
-    wa.onclick = () => enviarPaseWhatsapp(v.visitor_celular, j.qr_data_uri, text, "pase-vie-" + v.short_code + ".png");
+    wa.onclick = () => enviarPaseWhatsapp(j.qr_data_uri, text, "pase-vie-" + v.short_code + ".png");
   } else {
     wa.classList.add("hidden");
   }

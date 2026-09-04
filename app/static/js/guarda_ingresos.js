@@ -59,7 +59,7 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
       '<div class="row">' + btnWa + '<a class="button" download="pase-vie-' + esc(v.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a></div>');
     e.target.reset();
     if (v.visitor_celular) {
-      document.getElementById("btn-wa-manual").addEventListener("click", () => enviarPaseWhatsapp(v.visitor_celular, j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png"));
+      document.getElementById("btn-wa-manual").addEventListener("click", () => enviarPaseWhatsapp(j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png"));
     }
   } else {
     show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
@@ -87,7 +87,7 @@ if (paseCard) {
         "Código para portería: " + v.short_code + "\n" +
         "Un solo uso.";
       wa.classList.remove("hidden");
-      wa.onclick = () => enviarPaseWhatsapp(v.visitor_celular, j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png");
+      wa.onclick = () => enviarPaseWhatsapp(j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png");
     } else {
       wa.classList.add("hidden");
     }
