@@ -23,6 +23,7 @@ class User(Base):
     nombres = Column(String(120), nullable=False, default="")
     apellidos = Column(String(120), nullable=False, default="")
     role = Column(String(20), nullable=False)  # admin | guarda | residente
+    celular = Column(String(20))  # opcional, con WhatsApp
     tower = Column(String(10))
     apartment = Column(String(10))
     active = Column(Boolean, default=True, nullable=False)
@@ -42,6 +43,7 @@ class Visit(Base):
     visitor_name = Column(String(120), nullable=False)  # "Nombres Apellidos" para mostrar y buscar
     visitor_nombres = Column(String(80))  # dos campos claros: nombres y apellidos por separado
     visitor_apellidos = Column(String(80))
+    visitor_celular = Column(String(20))  # opcional: activa "Enviar por WhatsApp"
     subject = Column(String(200), nullable=False)
     id_number = Column(String(30))
     visitor_role = Column(String(20), nullable=False)  # visitante | domiciliario
@@ -86,6 +88,7 @@ class Package(Base):
     nombre_tercero = Column(String(120))  # "Nombres Apellidos" del destinatario de la etiqueta
     tercero_nombres = Column(String(80))
     tercero_apellidos = Column(String(80))
+    tercero_celular = Column(String(20))  # opcional, de la etiqueta: para avisarle al destinatario
     cedula_tercero = Column(String(30), index=True)  # cédula de quien reclamó, al entregar
 
     # Todo paquete nace con destino asociado: se copia del perfil del residente

@@ -29,6 +29,7 @@
     </div>
     <label>Asunto <input name="subject" required placeholder="Ej: visita familiar, entrega de domo"></label>
     <label>Identificación (opcional) <input name="id_number" placeholder="Cédula"></label>
+    <label>Celular del visitante (opcional) <input name="visitor_celular" inputmode="tel" placeholder="Ej: 300 123 4567 — activa el envío por WhatsApp"></label>
     <label>Rol
       <select name="visitor_role">
         <option value="visitante">Visitante</option>
@@ -65,6 +66,7 @@
   </details>
   <div class="row">
     <button id="btn-share" type="button">Compartir por WhatsApp</button>
+    <a id="btn-wa" class="button hidden" target="_blank" rel="noopener">Enviar por WhatsApp</a>
     <a id="btn-download" class="button" download="pase-vie.png">Descargar QR</a>
     <button id="btn-copy" type="button">Copiar código corto</button>
   </div>
@@ -79,7 +81,7 @@
     <tbody>
     {% for v in visits %}
       <tr>
-        <td>{{ v.visitor_name }}<br><small>{{ v.visitor_role }}</small></td>
+        <td>{{ v.visitor_name }}{% if v.visitor_celular %}<br><small>{{ v.visitor_celular }}</small>{% endif %}<br><small>{{ v.visitor_role }}</small></td>
         <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
         <td><strong>{{ v.short_code or "—" }}</strong></td>
         <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>

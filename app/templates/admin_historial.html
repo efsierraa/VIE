@@ -65,7 +65,7 @@
     <tbody>
     {% for v in visits %}
     <tr>
-      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}</td>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}{% if v.visitor_celular %}<br><small>{{ v.visitor_celular }}</small>{% endif %}</td>
       <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td>{{ names.get(v.resident_id, "—") }}</td>
@@ -74,7 +74,7 @@
       <td>{{ v.exit_at|dt }}</td>
       <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
       <td>{{ names.get(v.entry_guard_id, "—") }}</td>
-      <td>{% if v.manual %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
+      <td>{% if v.manual %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-cel="{{ v.visitor_celular or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -104,13 +104,13 @@
     {% for item in paquetes_hist %}
     <tr>
       <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><span class="observacion" title="{{ item.descripcion }}">{{ item.descripcion }}</span>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
-      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
       <td>{{ item.p.created_at|dt }}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.p.confirmed_at|dt }}</td>
       <td>{{ item.entrego }}</td>
-      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button>{% endif %} {% if item.p.tercero and item.p.status == "en_porteria" %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %} {% if item.p.status == "disputa" and not item.p.resuelta_porteria %}<button class="small" data-resolver="{{ item.p.uuid }}">Resolver disputa</button>{% if item.p.resuelta_residente %}<br><small class="auto">El residente ya aceptó</small>{% endif %}{% endif %}</td>
+      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button>{% endif %} {% if item.p.tercero and item.p.status == "en_porteria" %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %} {% if item.p.status == "disputa" and not item.p.resuelta_porteria %}<button class="small" data-resolver="{{ item.p.uuid }}">Resolver disputa</button>{% if item.p.resuelta_residente %}<br><small class="auto">El residente ya aceptó</small>{% endif %}{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>

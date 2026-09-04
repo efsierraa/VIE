@@ -25,13 +25,14 @@
       <label>Torre <input name="tower" placeholder="Ej: 1"></label>
       <label>Apartamento <input name="apartment" placeholder="Ej: 502"></label>
     </div>
+    <label>Celular (opcional) <input name="celular" inputmode="tel" placeholder="Ej: 300 123 4567"></label>
     <button type="submit">Crear cuenta</button>
   </form>
 </section>
 
 <details class="card">
   <summary>Importar usuarios desde CSV</summary>
-  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code>. Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
+  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code> (puedes añadir una octava columna <code>celular</code>, opcional). Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
   <form id="csv-form" class="form inline">
     <input type="file" id="csv-file" accept=".csv,text/csv" required>
     <button type="submit">Importar</button>
@@ -43,7 +44,7 @@
   <h2>Cuentas</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Torre · Apto</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Torre · Apto</th><th>Celular</th><th>Estado</th><th></th></tr></thead>
     <tbody>
     {% for u in users %}
     <tr>
@@ -51,6 +52,7 @@
       <td>{{ u.nombre_completo }}</td>
       <td><span class="chip role-{{ u.role }}">{{ u.role }}</span></td>
       <td>{% if u.tower %}T{{ u.tower }} · {{ u.apartment }}{% else %}—{% endif %}</td>
+      <td>{{ u.celular or "—" }}</td>
       <td>{% if u.active %}<span class="chip status-dentro">activa</span>{% else %}<span class="chip status-cancelada">inactiva</span>{% endif %}</td>
       <td>
         {% if u.id != user.id %}

@@ -90,7 +90,8 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
     const r = await fetch("/api/packages/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
       nombres,
       apellidos,
-      tower: torre, apartment: apto,
+      tower: document.getElementById("pkg-tercero-torre").value.trim(), apartment: document.getElementById("pkg-tercero-apto").value.trim(),
+      celular: document.getElementById("pkg-tercero-celular").value.trim(),
       description: document.getElementById("pkg-desc").value,
       photo_b64: pkgFotoB64,
     })});
@@ -195,6 +196,7 @@ if (editPkgCard && editPkgForm) {
     editPkgForm.dataset.uuid = btn.dataset.editarPaquete;
     document.getElementById("edit-p-nombres").value = btn.dataset.nombres || "";
     document.getElementById("edit-p-apellidos").value = btn.dataset.apellidos || "";
+    document.getElementById("edit-p-cel").value = btn.dataset.cel || "";
     document.getElementById("edit-p-torre").value = btn.dataset.torre || "";
     document.getElementById("edit-p-apto").value = btn.dataset.apto || "";
     document.getElementById("edit-p-desc").value = btn.dataset.desc || "";
@@ -206,6 +208,7 @@ if (editPkgCard && editPkgForm) {
     const r = await fetch("/api/packages/" + editPkgForm.dataset.uuid + "/editar", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
       nombres: document.getElementById("edit-p-nombres").value.trim(),
       apellidos: document.getElementById("edit-p-apellidos").value.trim(),
+      celular: document.getElementById("edit-p-cel").value,
       tower: document.getElementById("edit-p-torre").value,
       apartment: document.getElementById("edit-p-apto").value,
       description: document.getElementById("edit-p-desc").value,

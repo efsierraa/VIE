@@ -67,6 +67,7 @@ def visit_dict(v: Visit) -> dict:
         "visitor_name": v.visitor_name,
         "visitor_nombres": v.visitor_nombres,
         "visitor_apellidos": v.visitor_apellidos,
+        "visitor_celular": v.visitor_celular,
         "subject": v.subject,
         "id_number": v.id_number,
         "visitor_role": v.visitor_role,
@@ -101,10 +102,26 @@ def resolver_nombre(nombres: str | None, apellidos: str | None, fallback: str | 
     return completo, None, None
 
 
+def normalizar_celular(cel: str | None) -> str | None:
+    """Celular opcional: solo dígitos; 10 dígitos (colombiano) lleva prefijo 57.
+
+    Vacío → None (el campo nunca es obligatorio). Inválido → 400.
+    """
+    digitos = "".join(ch for ch in (cel or "") if ch.isdigit())
+    if not digitos:
+        return None
+    if len(digitos) == 10:
+        digitos = "57" + digitos
+    if not 7 <= len(digitos) <= 15:
+        raise HTTPException(400, "Número de celular no válido (7 a 15 dígitos)")
+    return digitos
+
+
 class VisitIn(BaseModel):
     visitor_nombres: str | None = None
     visitor_apellidos: str | None = None
     visitor_name: str | None = None  # compatibilidad: clientes antiguos
+    visitor_celular: str | None = None  # opcional: activa "Enviar por WhatsApp"
     subject: str
     id_number: str | None = None
     visitor_role: str
@@ -121,6 +138,7 @@ class ManualIn(BaseModel):
     visitor_nombres: str | None = None
     visitor_apellidos: str | None = None
     visitor_name: str | None = None  # compatibilidad: clientes antiguos
+    visitor_celular: str | None = None  # opcional: activa "Enviar por WhatsApp"
     subject: str
     id_number: str | None = None
     visitor_role: str
@@ -136,6 +154,7 @@ class UserIn(BaseModel):
     role: str
     tower: str | None = None
     apartment: str | None = None
+    celular: str | None = None  # opcional
 
 
 class PasswordAssign(BaseModel):
@@ -145,6 +164,10 @@ class PasswordAssign(BaseModel):
 class PasswordChange(BaseModel):
     actual: str
     nueva: str
+
+
+class PerfilIn(BaseModel):
+    celular: str | None = None  # opcional: cada quien actualiza el suyo
 
 
 def _crear_usuario(
@@ -157,6 +180,7 @@ def _crear_usuario(
     role: str,
     tower: str | None = None,
     apartment: str | None = None,
+    celular: str | None = None,
     creado_por: str = "sistema",
 ) -> User:
     """Crea un usuario validando todo; levanta ValueError con el mensaje para el humano."""
@@ -185,6 +209,7 @@ def _crear_usuario(
         role=role,
         tower=tower,
         apartment=apartment,
+        celular=normalizar_celular(celular),
     )
     db.add(user)
     db.commit()
@@ -221,6 +246,7 @@ def create_visit(
         visitor_name=visitor_name,
         visitor_nombres=v_nombres,
         visitor_apellidos=v_apellidos,
+        visitor_celular=normalizar_celular(data.visitor_celular),
         subject=subject,
         id_number=(data.id_number or "").strip() or None,
         visitor_role=data.visitor_role,
@@ -414,6 +440,7 @@ def manual_entry(
         visitor_name=visitor_name,
         visitor_nombres=v_nombres,
         visitor_apellidos=v_apellidos,
+        visitor_celular=normalizar_celular(data.visitor_celular),
         subject=subject,
         id_number=(data.id_number or "").strip() or None,
         visitor_role=data.visitor_role,
@@ -458,11 +485,27 @@ def create_user(
             role=data.role,
             tower=data.tower,
             apartment=data.apartment,
+            celular=data.celular,
             creado_por=admin.username,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
+
+
+@router.patch("/perfil")
+def actualizar_perfil(
+    data: PerfilIn,
+    user: User = Depends(require_api("residente", "guarda", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Cada quien actualiza su propio celular (opcional)."""
+    try:
+        user.celular = normalizar_celular(data.celular)
+    except HTTPException:
+        raise
+    db.commit()
+    return {"ok": True, "celular": user.celular}
 
 
 @router.post("/users/csv")
@@ -471,7 +514,7 @@ async def import_users_csv(
     admin: User = Depends(require_api("admin")),
     db: Session = Depends(get_db),
 ):
-    """CSV con encabezado: nombres,apellidos,usuario,clave,rol,torre,apartamento."""
+    """CSV con encabezado: nombres,apellidos,usuario,clave,rol,torre,apartamento (celular opcional)."""
     raw = await file.read()
     try:
         texto = raw.decode("utf-8-sig")
@@ -482,8 +525,9 @@ async def import_users_csv(
         raise HTTPException(400, "El CSV está vacío")
     esperado = ["nombres", "apellidos", "usuario", "clave", "rol", "torre", "apartamento"]
     encabezado = [c.strip().lower() for c in filas[0]]
-    if encabezado != esperado:
-        raise HTTPException(400, "El CSV debe iniciar con la fila: " + ",".join(esperado))
+    con_celular = len(encabezado) == 8 and encabezado[7] == "celular"
+    if encabezado != esperado and not con_celular:
+        raise HTTPException(400, "El CSV debe iniciar con la fila: " + ",".join(esperado) + " (celular opcional)")
 
     creados, errores = 0, []
     for num, fila in enumerate(filas[1:], start=2):
@@ -493,6 +537,7 @@ async def import_users_csv(
             errores.append(f"línea {num}: faltan columnas")
             continue
         nombres, apellidos, username, clave, rol, torre, apto = (c.strip() for c in fila[:7])
+        celular = fila[7].strip() if con_celular and len(fila) > 7 else None
         try:
             _crear_usuario(
                 db,
@@ -503,6 +548,7 @@ async def import_users_csv(
                 role=rol,
                 tower=torre,
                 apartment=apto,
+                celular=celular,
                 creado_por=f"{admin.username} (csv)",
             )
             creados += 1
@@ -618,6 +664,7 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
         "nombre_tercero": p.nombre_tercero,
         "tercero_nombres": p.tercero_nombres,
         "tercero_apellidos": p.tercero_apellidos,
+        "tercero_celular": p.tercero_celular,
         "cedula_tercero": p.cedula_tercero,
         "tower": p.tower,
         "apartment": p.apartment,
@@ -829,6 +876,7 @@ class PackageManualIn(BaseModel):
     nombres: str | None = None
     apellidos: str | None = None
     nombre: str | None = None  # compatibilidad: clientes antiguos
+    celular: str | None = None  # opcional: celular de la etiqueta
     tower: str
     apartment: str
     description: str | None = None
@@ -843,11 +891,13 @@ class EditarVisitaIn(BaseModel):
     visitor_role: str
     tower: str
     apartment: str
+    visitor_celular: str | None = None  # opcional
 
 
 class EditarPaqueteIn(BaseModel):
     nombres: str
     apellidos: str
+    celular: str | None = None  # opcional
     tower: str
     apartment: str
     description: str | None = None
@@ -904,6 +954,7 @@ def editar_visita(
     if data.visitor_role not in VISITOR_ROLES:
         raise HTTPException(400, "Rol de visitante no válido")
     id_number = (data.id_number or "").strip() or None
+    celular = normalizar_celular(data.visitor_celular)
 
     cambios = []
     pares = (
@@ -914,6 +965,7 @@ def editar_visita(
         ("rol", visit.visitor_role, data.visitor_role),
         ("torre", visit.tower, tower),
         ("apto", visit.apartment, apartment),
+        ("celular", visit.visitor_celular, celular),
     )
     for etiqueta, antes, despues in pares:
         if (antes or "") != (despues or ""):
@@ -927,6 +979,7 @@ def editar_visita(
     visit.visitor_role = data.visitor_role
     visit.tower = tower
     visit.apartment = apartment
+    visit.visitor_celular = celular
     _registrar_edicion(db, "visita", visit.uuid, user, cambios)
     db.commit()
     log.info("visita_editada uuid=%s por=%s campos=%s", visit.uuid, user.username, len(cambios))
@@ -962,11 +1015,13 @@ def editar_paquete(
     description = (data.description or "").strip() or None
     if description and len(description) > 200:
         raise HTTPException(400, "La descripción es demasiado larga")
+    celular = normalizar_celular(data.celular)
 
     cambios = []
     pares = (
         ("nombres", pkg.tercero_nombres, nombres),
         ("apellidos", pkg.tercero_apellidos, apellidos),
+        ("celular", pkg.tercero_celular, celular),
         ("torre", pkg.tower, tower),
         ("apto", pkg.apartment, apartment),
         ("descripción", pkg.description, description),
@@ -978,6 +1033,7 @@ def editar_paquete(
     pkg.tercero_nombres = nombres
     pkg.tercero_apellidos = apellidos
     pkg.nombre_tercero = completo
+    pkg.tercero_celular = celular
     pkg.tower = tower
     pkg.apartment = apartment
     pkg.description = description
@@ -1024,6 +1080,7 @@ def registrar_paquete_tercero(
         nombre_tercero=nombre,
         tercero_nombres=t_nombres,
         tercero_apellidos=t_apellidos,
+        tercero_celular=normalizar_celular(data.celular),
         tower=tower,
         apartment=apartment,
     )

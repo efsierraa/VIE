@@ -20,6 +20,8 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 3. **Visitas activas**: el guarda puede consultar en cualquier momento qué visitas están **dentro del edificio y vigentes** — con buscador por nombre y paginación — para cotejar "¿está registrada y activa?" aunque no reconozca al visitante.
 4. **Administración**: supervisa todo desde el historial con trazabilidad completa.
 
+**Celular opcional en todo**: perfiles, visitas y paquetes de terceros. Se muestra en las tablas e historiales (y en el Excel) y activa el botón **Enviar por WhatsApp** con el pase precargado — sin celular, el botón no aparece.
+
 ### Paquetes
 
 1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente. Para encontrarlo busca por nombre o apellido; si va por destino, **torre y apartamento juntos**: `T4 1005`, `4 1005`, `4-1005` o `T4.1005` — torre sola o apto solo no arroja resultados (serían demasiados).

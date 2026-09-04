@@ -52,11 +52,21 @@ def _ensure_schema():
         if col not in vis_cols:
             with engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE visits ADD COLUMN {col} VARCHAR(80)")
+    if "visitor_celular" not in vis_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE visits ADD COLUMN visitor_celular VARCHAR(20)")
     pkg_cols = {c["name"] for c in insp.get_columns("packages")}
     for col in ("tercero_nombres", "tercero_apellidos"):
         if col not in pkg_cols:
             with engine.begin() as conn:
                 conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} VARCHAR(80)")
+    if "tercero_celular" not in pkg_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero_celular VARCHAR(20)")
+    usr_cols = {c["name"] for c in insp.get_columns("users")}
+    if "celular" not in usr_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN celular VARCHAR(20)")
     faltan_resolucion = {"resuelta_porteria", "resuelta_residente", "resuelta_at"} - pkg_cols
     if faltan_resolucion:
         falso = "FALSE" if engine.dialect.name == "postgresql" else "0"

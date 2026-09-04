@@ -17,6 +17,7 @@ function llenarVisita(btn) {
   document.getElementById("edit-v-apellidos").value = btn.dataset.apellidos || "";
   document.getElementById("edit-v-asunto").value = btn.dataset.asunto || "";
   document.getElementById("edit-v-id").value = btn.dataset.idnum || "";
+  document.getElementById("edit-v-cel").value = btn.dataset.cel || "";
   document.getElementById("edit-v-rol").value = btn.dataset.rol || "visitante";
   document.getElementById("edit-v-torre").value = btn.dataset.torre || "";
   document.getElementById("edit-v-apto").value = btn.dataset.apto || "";
@@ -32,6 +33,7 @@ function llenarPaquete(btn) {
   document.getElementById("edit-p-torre").value = btn.dataset.torre || "";
   document.getElementById("edit-p-apto").value = btn.dataset.apto || "";
   document.getElementById("edit-p-desc").value = btn.dataset.desc || "";
+  document.getElementById("edit-p-cel").value = btn.dataset.cel || "";
   const card = document.getElementById("edit-paquete-card");
   card.classList.remove("hidden");
   card.scrollIntoView({behavior: "smooth"});
@@ -47,6 +49,7 @@ if (editVForm) {
       visitor_apellidos: document.getElementById("edit-v-apellidos").value.trim(),
       subject: document.getElementById("edit-v-asunto").value,
       id_number: document.getElementById("edit-v-id").value,
+      visitor_celular: document.getElementById("edit-v-cel").value,
       visitor_role: document.getElementById("edit-v-rol").value,
       tower: document.getElementById("edit-v-torre").value,
       apartment: document.getElementById("edit-v-apto").value,
@@ -66,6 +69,7 @@ if (editPForm) {
       tower: document.getElementById("edit-p-torre").value,
       apartment: document.getElementById("edit-p-apto").value,
       description: document.getElementById("edit-p-desc").value,
+      celular: document.getElementById("edit-p-cel").value,
     })});
     const j = await r.json();
     if (r.ok && j.ok) location.reload();

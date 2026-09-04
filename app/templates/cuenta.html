@@ -4,6 +4,11 @@
 <h1>Mi cuenta</h1>
 <section class="card narrow">
   <p class="hint">Sesión de <strong>{{ user.nombre_completo }}</strong> ({{ user.role }}).</p>
+  <h2>Mi celular</h2>
+  <form id="cel-form" class="form">
+    <label>Celular (opcional) <input name="celular" inputmode="tel" value="{{ user.celular or '' }}" placeholder="Ej: 300 123 4567"></label>
+    <button type="submit">Guardar celular</button>
+  </form>
   <h2>Cambiar mi clave</h2>
   <form id="pw-form" class="form">
     <label>Clave actual <input type="password" name="actual" required></label>

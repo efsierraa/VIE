@@ -13,10 +13,10 @@
     {% for item in pendientes %}
     <tr>
       <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% endif %}</td>
-      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
-      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
+      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -59,6 +59,7 @@
           <input id="pkg-tercero-apellidos" maxlength="80">
         </label>
       </div>
+      <label>Celular del destinatario (opcional) <input id="pkg-tercero-celular" inputmode="tel" maxlength="20" placeholder="Ej: 300 123 4567"></label>
       <div class="row">
         <label>Torre <input id="pkg-tercero-torre" maxlength="10" placeholder="Ej: 4"></label>
         <label>Apartamento <input id="pkg-tercero-apto" maxlength="10" placeholder="Ej: 1005"></label>
@@ -110,7 +111,7 @@
     {% for item in entregados_hoy %}
     <tr>
       <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
-      <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
+      <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.entrego }}{% if item.p.status == "disputa" and not item.p.resuelta_porteria %}<br><button class="small" data-resolver="{{ item.p.uuid }}">Resolver disputa</button>{% if item.p.resuelta_residente %}<br><small class="auto">El residente ya aceptó; falta portería</small>{% endif %}{% endif %}</td>
@@ -143,6 +144,7 @@
       <label>Apartamento <input id="edit-p-apto" required maxlength="10"></label>
     </div>
     <label>Descripción (opcional) <input id="edit-p-desc" maxlength="200"></label>
+    <label>Celular (opcional) <input id="edit-p-cel" maxlength="20" inputmode="tel"></label>
     <p class="hint">Puedes editar durante 1 hora desde el registro. Toda edición queda registrada.</p>
     <button type="submit">Guardar cambios</button>
   </form>

@@ -42,11 +42,21 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
   const r = await fetch("/api/visits/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
   const j = await r.json();
   if (r.ok && j.ok) {
+    const v = j.visit;
+    const texto = "Pase de ingreso VIE\n" +
+      "Visitante: " + v.visitor_name + "\n" +
+      "Asunto: " + v.subject + "\n" +
+      "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
+      "Código para portería: " + v.short_code + "\n" +
+      "Vigente 1 hora. Un solo uso.";
+    const btnWa = v.visitor_celular
+      ? '<a class="button" target="_blank" rel="noopener" href="https://wa.me/' + v.visitor_celular + '?text=' + encodeURIComponent(texto) + '">Enviar por WhatsApp</a>'
+      : "";
     show('<p class="alert ok">' + esc(j.message) + '. Entrega el pase al visitante:</p>' +
       '<div class="qr-box"><img src="' + j.qr_data_uri + '" alt="QR del pase"></div>' +
-      '<p class="short-code">Código para portería: <strong>' + esc(j.visit.short_code) + '</strong></p>' +
+      '<p class="short-code">Código para portería: <strong>' + esc(v.short_code) + '</strong></p>' +
       '<p class="hint">El pase es válido por 1 hora: sirve para marcar la salida y, si nadie la marca, se marca sola al vencer. Para visitas más largas, un residente debe registrarlo.</p>' +
-      '<div class="row"><a class="button" download="pase-vie-' + esc(j.visit.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a><button type="button" id="btn-listo">Listo</button></div>');
+      '<div class="row">' + btnWa + '<a class="button" download="pase-vie-' + esc(v.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a><button type="button" id="btn-listo">Listo</button></div>');
     e.target.reset();
     document.getElementById("btn-listo").addEventListener("click", () => location.reload());
   } else {
@@ -61,10 +71,24 @@ if (paseCard) {
     const r = await fetch("/api/visits/" + btn.dataset.verqr + "/pass");
     const j = await r.json();
     if (!(r.ok && j.ok)) { alert(j.detail || "No se pudo abrir el pase"); return; }
+    const v = j.visit;
     document.getElementById("pase-img").src = j.qr_data_uri;
-    document.getElementById("pase-codigo").textContent = j.visit.short_code;
+    document.getElementById("pase-codigo").textContent = v.short_code;
     document.getElementById("pase-descargar").href = j.qr_data_uri;
-    document.getElementById("pase-descargar").download = "pase-vie-" + j.visit.short_code + ".png";
+    document.getElementById("pase-descargar").download = "pase-vie-" + v.short_code + ".png";
+    const wa = document.getElementById("pase-wa");
+    if (v.visitor_celular) {
+      const texto = "Pase de ingreso VIE\n" +
+        "Visitante: " + v.visitor_name + "\n" +
+        "Asunto: " + v.subject + "\n" +
+        "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
+        "Código para portería: " + v.short_code + "\n" +
+        "Un solo uso.";
+      wa.href = "https://wa.me/" + v.visitor_celular + "?text=" + encodeURIComponent(texto);
+      wa.classList.remove("hidden");
+    } else {
+      wa.classList.add("hidden");
+    }
     paseCard.classList.remove("hidden");
     paseCard.scrollIntoView({behavior: "smooth"});
   }));
@@ -81,6 +105,7 @@ if (editCard && editForm) {
     document.getElementById("edit-v-apellidos").value = btn.dataset.apellidos || "";
     document.getElementById("edit-v-asunto").value = btn.dataset.asunto || "";
     document.getElementById("edit-v-id").value = btn.dataset.idnum || "";
+    document.getElementById("edit-v-cel").value = btn.dataset.cel || "";
     document.getElementById("edit-v-rol").value = btn.dataset.rol || "visitante";
     document.getElementById("edit-v-torre").value = btn.dataset.torre || "";
     document.getElementById("edit-v-apto").value = btn.dataset.apto || "";
@@ -94,6 +119,7 @@ if (editCard && editForm) {
       visitor_apellidos: document.getElementById("edit-v-apellidos").value.trim(),
       subject: document.getElementById("edit-v-asunto").value,
       id_number: document.getElementById("edit-v-id").value,
+      visitor_celular: document.getElementById("edit-v-cel").value,
       visitor_role: document.getElementById("edit-v-rol").value,
       tower: document.getElementById("edit-v-torre").value,
       apartment: document.getElementById("edit-v-apto").value,

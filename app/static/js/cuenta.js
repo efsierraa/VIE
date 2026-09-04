@@ -8,3 +8,13 @@ form.addEventListener("submit", async e => {
   if (r.ok && j.ok) { alert("Clave actualizada."); form.reset(); }
   else alert(j.detail || "Error cambiando la clave");
 });
+
+const celForm = document.getElementById("cel-form");
+celForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const celular = celForm.querySelector("input[name=celular]").value.trim();
+  const r = await fetch("/api/perfil", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({celular})});
+  const j = await r.json();
+  if (r.ok && j.ok) alert("Celular guardado.");
+  else alert(j.detail || "Error guardando el celular");
+});

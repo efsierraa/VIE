@@ -146,6 +146,7 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
                 "foto_disponible": p.photo is not None,
                 "destinatario": (p.nombre_tercero or "—") if p.tercero else (residente.nombre_completo if residente else "—"),
                 "cedula": p.cedula_tercero or "",
+                "celular": (p.tercero_celular or "") if p.tercero else (residente.celular if residente else ""),
                 "destino": destino,
                 "entrego": usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
             }
@@ -418,6 +419,19 @@ def admin_page(
     )
 
 
+@router.get("/cuenta", response_class=HTMLResponse)
+def cuenta_page(
+    request: Request,
+    user: User = Depends(require_page("admin", "guarda", "residente")),
+):
+    """Mi cuenta: celular propio y cambio de clave, para todos los roles."""
+    return templates.TemplateResponse(
+        request,
+        "cuenta.html",
+        {"user": user, "tabs": nav_de(user.role, "")},
+    )
+
+
 # --- Admin · Cuentas ---------------------------------------------------------
 
 
@@ -618,7 +632,7 @@ def exportar_visitas(
         hoja_base.title = "Ingresos"
         hoja_base.append(
             [
-                "Fecha entrada", "Hora entrada", "Visitante", "Identificación", "Rol",
+                "Fecha entrada", "Hora entrada", "Visitante", "Identificación", "Celular", "Rol",
                 "Asunto", "Torre", "Apartamento", "Autorizó", "Estado",
                 "Hora salida", "Duración", "Registró", "Entrada manual",
             ]
@@ -633,6 +647,7 @@ def exportar_visitas(
                     entrada.strftime("%H:%M"),
                     v.visitor_name,
                     v.id_number or "",
+                    v.visitor_celular or "",
                     v.visitor_role,
                     v.subject,
                     v.tower,
@@ -670,7 +685,7 @@ def _hoja_paquetes(wb, pkgs, usuarios):
     ws = wb.create_sheet("Paquetes")
     ws.append(
         [
-            "Fecha registro", "Destinatario", "Cédula", "Torre", "Apartamento", "Descripción",
+            "Fecha registro", "Destinatario", "Cédula", "Celular", "Torre", "Apartamento", "Descripción",
             "Estado", "Entregado", "Confirmado", "Entregó",
         ]
     )
@@ -680,10 +695,12 @@ def _hoja_paquetes(wb, pkgs, usuarios):
         confirmado = p.confirmed_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if p.confirmed_at else None
         if p.tercero:
             destinatario = (p.nombre_tercero or "") + " (no registrado)"
-            torre, apto = "", ""
+            celular = p.tercero_celular or ""
+            torre, apto = p.tower or "", p.apartment or ""
         else:
             residente = usuarios.get(p.resident_id)
             destinatario = residente.nombre_completo if residente else ""
+            celular = residente.celular if residente else ""
             torre = residente.tower if residente else ""
             apto = residente.apartment if residente else ""
         cedula = p.cedula_tercero or ""
@@ -692,6 +709,7 @@ def _hoja_paquetes(wb, pkgs, usuarios):
                 creado.strftime("%d/%m/%Y %H:%M") if creado else "",
                 destinatario,
                 cedula,
+                celular,
                 torre,
                 apto,
                 p.description or "",

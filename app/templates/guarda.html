@@ -37,7 +37,7 @@
     <tbody>
     {% for v in activas %}
     <tr>
-      <td>{{ v.visitor_name }}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}</td>
+      <td>{{ v.visitor_name }}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}{% if v.visitor_celular %} <small>· {{ v.visitor_celular }}</small>{% endif %}</td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td>{{ v.entry_at|dt }}</td>
       <td>{{ v.expires_at|dt }}{% if v|extendida %} <span class="chip extendida">extendida</span>{% endif %}</td>
@@ -69,6 +69,7 @@
     </div>
     <label>Asunto <input name="subject" required></label>
     <label>Identificación (opcional) <input name="id_number"></label>
+    <label>Celular (opcional) <input name="visitor_celular" inputmode="tel" placeholder="Ej: 300 123 4567 — activa el envío del pase por WhatsApp"></label>
     <label>Rol
       <select name="visitor_role">
         <option value="visitante">Visitante</option>
@@ -93,7 +94,7 @@
     <tbody>
     {% for v in visits %}
     <tr>
-      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}</td>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}{% if v.visitor_celular %} <small>· {{ v.visitor_celular }}</small>{% endif %}</td>
       <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
@@ -101,7 +102,7 @@
       <td>{{ v.exit_at|dt }}{% if v.salida_auto %}<br><small class="auto">salida automática</small>{% endif %}</td>
       <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
       <td>{{ names.get(v.entry_guard_id, "—") }}</td>
-      <td>{% if v.status in ("pendiente", "dentro") %}<button class="small" data-verqr="{{ v.uuid }}">Ver QR</button> {% endif %}{% if v.uuid in editables %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
+      <td>{% if v.status in ("pendiente", "dentro") %}<button class="small" data-verqr="{{ v.uuid }}">Ver QR</button> {% endif %}{% if v.uuid in editables %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-cel="{{ v.visitor_celular or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -127,6 +128,7 @@
     </div>
     <label>Asunto <input id="edit-v-asunto" required maxlength="120"></label>
     <label>Identificación (opcional) <input id="edit-v-id" maxlength="30"></label>
+    <label>Celular (opcional) <input id="edit-v-cel" maxlength="20" inputmode="tel"></label>
     <label>Rol
       <select id="edit-v-rol">
         <option value="visitante">Visitante</option>
@@ -148,6 +150,7 @@
   <p class="short-code">Código para portería: <strong id="pase-codigo"></strong></p>
   <p class="hint">Muéstralo o reenvíalo al visitante mientras la visita esté activa: el QR sirve para marcar la salida.</p>
   <div class="row">
+    <a id="pase-wa" class="button hidden" target="_blank" rel="noopener">Enviar por WhatsApp</a>
     <a id="pase-descargar" class="button" download="pase-vie.png">Descargar QR</a>
     <button id="pase-listo" type="button">Listo</button>
   </div>
