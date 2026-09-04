@@ -499,11 +499,14 @@ def actualizar_perfil(
     user: User = Depends(require_api("residente", "guarda", "admin")),
     db: Session = Depends(get_db),
 ):
-    """Cada quien actualiza su propio celular (opcional)."""
-    try:
-        user.celular = normalizar_celular(data.celular)
-    except HTTPException:
-        raise
+    """Cada quien actualiza su propio celular (opcional). El resto de sus datos
+    (nombres, torre, apto) solo los cambia administración."""
+    nuevo = normalizar_celular(data.celular)
+    cambios = []
+    if (user.celular or "") != (nuevo or ""):
+        cambios.append(f"celular: '{user.celular or ''}' → '{nuevo or ''}'")
+    user.celular = nuevo
+    _registrar_edicion(db, "usuario", user.username, user, cambios)
     db.commit()
     return {"ok": True, "celular": user.celular}
 

@@ -67,7 +67,9 @@ def test_historial_filtros_y_pagina_combinados(client):
     # el filtro viaja con la página
     page = client.get("/admin/historial?tipo=ingresos&q=055")
     assert "Masiva 055" in page.text
-    assert "Siguiente →" not in page.text  # pocas coincidencias: sin paginador
+    ingresos = page.text.split("Ingresos</h2>")[1].split("</section>")[0]
+    assert "Siguiente →" not in ingresos  # pocas coincidencias: sin paginador en la tabla de ingresos
+    # (el Control de ediciones, al pie de la página, tiene su propio paginador)
 
     # torre viaja también en los enlaces del paginador
     page = client.get("/admin/historial?tipo=ingresos&torre=1")
