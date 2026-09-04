@@ -5,7 +5,8 @@ from conftest import login
 def test_acerca_es_publica_y_completa(client):
     r = client.get("/acerca")
     assert r.status_code == 200
-    assert "Hecho en 🇨🇴 con el corazón" in r.text
+    assert "Hecho con amor en" in r.text
+    assert "bandera-co.svg" in r.text  # el emoji de bandera no se ve en Windows: va como imagen
     assert "github.com/efsierraa/VIE" in r.text
     assert "pull requests" in r.text.lower()
     assert "software libre" in r.text

@@ -23,7 +23,15 @@ from app.auth import (
 )
 from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
-from app.models import PACKAGE_STATUS, VISIT_STATUS, Package, Visit, User
+from app.models import (
+    MINUTOS_GRACIA_EDICION,
+    PACKAGE_STATUS,
+    VISIT_STATUS,
+    EditLog,
+    Package,
+    Visit,
+    User,
+)
 from app.routers.api import qr_data_uri
 from app.security import sign_package
 from app.utils import format_duration, utcnow
@@ -81,6 +89,32 @@ def es_extendida(v) -> bool:
 
 
 templates.env.filters["extendida"] = es_extendida
+
+
+def editable_visita(v, user_id: int) -> bool:
+    """El guarda puede editar su ingreso manual durante el periodo de gracia."""
+    if not v.manual:
+        return False
+    if (v.entry_guard_id or v.resident_id) != user_id:
+        return False
+    momento = v.entry_at or v.created_at
+    return utcnow() - momento <= timedelta(minutes=MINUTOS_GRACIA_EDICION)
+
+
+def editable_paquete(p, user_id: int) -> bool:
+    """El guarda puede editar su paquete de tercero durante el periodo de gracia."""
+    if not p.tercero:
+        return False
+    if (p.delivered_by or p.resident_id) != user_id:
+        return False
+    return utcnow() - p.created_at <= timedelta(minutes=MINUTOS_GRACIA_EDICION)
+
+
+def editados_en(db: Session, uuids: set) -> set:
+    """Uuids de la página que tienen al menos una edición registrada."""
+    if not uuids:
+        return set()
+    return {row[0] for row in db.query(EditLog.entity_uuid).filter(EditLog.entity_uuid.in_(uuids)).all()}
 
 
 def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
@@ -304,6 +338,8 @@ def guarda_page(
             "names": name_map(db, list(ingresos) + list(activas)),
             "activas": activas,
             "f_q_activas": q_activas,
+            "editables": {v.uuid for v in list(ingresos) + list(activas) if editable_visita(v, user.id)},
+            "editados": editados_en(db, {v.uuid for v in list(ingresos) + list(activas)}),
             "pager_h": pager(_pagina(pagina_h), h_ant, h_sig, "/guarda", {}, "pagina_h"),
             "pager_a": pager(_pagina(pagina_a), a_ant, a_sig, "/guarda", {"q_activas": q_a}, "pagina_a"),
             "tabs": nav_de("guarda", "ingresos"),
@@ -338,13 +374,17 @@ def guarda_paquetes_page(
         _pagina(pagina_e),
         50,
     )
+    pend_items = paquetes_con_nombres(db, pendientes)
+    ent_items = paquetes_con_nombres(db, entregados_hoy)
     return templates.TemplateResponse(
         request,
         "guarda_paquetes.html",
         {
             "user": user,
-            "pendientes": paquetes_con_nombres(db, pendientes),
-            "entregados_hoy": paquetes_con_nombres(db, entregados_hoy),
+            "pendientes": pend_items,
+            "entregados_hoy": ent_items,
+            "editables": {i["p"].uuid for i in pend_items + ent_items if editable_paquete(i["p"], user.id)},
+            "editados": editados_en(db, {i["p"].uuid for i in pend_items + ent_items}),
             "pager_p": pager(_pagina(pagina), p_ant, p_sig, "/guarda/paquetes", {}, "pagina"),
             "pager_e": pager(_pagina(pagina_e), e_ant, e_sig, "/guarda/paquetes", {}, "pagina_e"),
             "tabs": nav_de("guarda", "paquetes"),
@@ -409,6 +449,7 @@ def admin_historial_page(
     torre: str = "",
     pagina_v: str = "1",
     pagina_p: str = "1",
+    pagina_ed: str = "1",
     db: Session = Depends(get_db),
 ):
     if tipo not in ("ingresos", "paquetes", "ambos"):
@@ -470,6 +511,25 @@ def admin_historial_page(
         pkgs, p_ant, p_sig = paginar(query, _pagina(pagina_p), 50)
         pager_paquetes = pager(_pagina(pagina_p), p_ant, p_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q}, "pagina_p")
 
+    paquetes_hist = paquetes_con_nombres(db, pkgs) if pkgs else []
+    uids = {v.uuid for v in visits} | {i["p"].uuid for i in paquetes_hist}
+    editados = editados_en(db, uids)
+
+    # Control de ediciones: qué cambió, quién y cuándo
+    logs, ed_ant, ed_sig = paginar(
+        db.query(EditLog).order_by(EditLog.id.desc()),
+        _pagina(pagina_ed),
+        25,
+    )
+    pager_ed = pager(_pagina(pagina_ed), ed_ant, ed_sig, "/admin/historial", {"tipo": tipo}, "pagina_ed")
+    l_uuids = {l.entity_uuid for l in logs}
+    v_map = {v.uuid: v.visitor_name for v in db.query(Visit).filter(Visit.uuid.in_(l_uuids))} if l_uuids else {}
+    p_map = {p.uuid: p.nombre_tercero for p in db.query(Package).filter(Package.uuid.in_(l_uuids))} if l_uuids else {}
+    labels = {
+        u: ("Visita de " + v_map[u]) if u in v_map else ("Paquete de " + (p_map.get(u) or "?"))
+        for u in l_uuids
+    }
+
     return templates.TemplateResponse(
         request,
         "admin_historial.html",
@@ -480,9 +540,13 @@ def admin_historial_page(
             "ver_paquetes": ver_paquetes,
             "visits": visits,
             "names": name_map(db, visits) if visits else {},
-            "paquetes_hist": paquetes_con_nombres(db, pkgs) if pkgs else [],
+            "paquetes_hist": paquetes_hist,
             "pager_ingresos": pager_ingresos,
             "pager_paquetes": pager_paquetes,
+            "editados": editados,
+            "logs": logs,
+            "labels": labels,
+            "pager_ed": pager_ed,
             "f_fecha": fecha,
             "f_estado": estado,
             "f_q": q,

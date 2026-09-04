@@ -20,9 +20,11 @@ from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
 from app.models import (
     DIAS_FOTO_ENTREGADA,
+    MINUTOS_GRACIA_EDICION,
     ROLES,
     VALID_HOURS,
     VISITOR_ROLES,
+    EditLog,
     Package,
     User,
     Visit,
@@ -817,6 +819,155 @@ class PackageManualIn(BaseModel):
     apartment: str
     description: str | None = None
     photo_b64: str
+
+
+class EditarVisitaIn(BaseModel):
+    visitor_nombres: str
+    visitor_apellidos: str
+    subject: str
+    id_number: str | None = None
+    visitor_role: str
+    tower: str
+    apartment: str
+
+
+class EditarPaqueteIn(BaseModel):
+    nombres: str
+    apellidos: str
+    tower: str
+    apartment: str
+    description: str | None = None
+
+
+def _registrar_edicion(db: Session, entity_type: str, entity_uuid: str, editor: User, cambios: list[str]) -> None:
+    """Guarda en el control de ediciones qué cambió, quién y cuándo."""
+    if cambios:
+        db.add(
+            EditLog(
+                entity_type=entity_type,
+                entity_uuid=entity_uuid,
+                editor_id=editor.id,
+                cambios=" · ".join(cambios),
+            )
+        )
+
+
+def _puede_editar(registrado_por: int | None, momento, user: User) -> bool:
+    """El guarda edita solo lo suyo dentro del periodo de gracia; el admin, a voluntad."""
+    if user.role == "admin":
+        return True
+    if registrado_por != user.id:
+        return False
+    return utcnow() - momento <= timedelta(minutes=MINUTOS_GRACIA_EDICION)
+
+
+@router.patch("/visits/{visit_uuid}/editar")
+def editar_visita(
+    visit_uuid: str,
+    data: EditarVisitaIn,
+    user: User = Depends(require_api("guarda", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Edita una visita ingresada manualmente. El guarda solo lo suyo dentro de la
+    hora de gracia; administración a voluntad. Toda edición queda registrada."""
+    visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
+    if visit is None or not visit.manual:
+        raise HTTPException(404, "Visita no encontrada o no editable (solo ingresos manuales)")
+    momento = visit.entry_at or visit.created_at
+    if not _puede_editar(visit.entry_guard_id or visit.resident_id, momento, user):
+        if (visit.entry_guard_id or visit.resident_id) != user.id:
+            raise HTTPException(403, "Solo quien registró la visita puede editarla (o administración)")
+        raise HTTPException(400, "Pasó el periodo de gracia de 1 hora; pide a administración que la edite")
+
+    completo, nombres, apellidos = resolver_nombre(data.visitor_nombres, data.visitor_apellidos)
+    subject = data.subject.strip()
+    tower = data.tower.strip().upper()
+    apartment = data.apartment.strip()
+    if not subject or not tower or not apartment:
+        raise HTTPException(400, "Asunto, torre y apartamento son obligatorios")
+    if len(subject) > 120 or len(tower) > 10 or len(apartment) > 10:
+        raise HTTPException(400, "Campo demasiado largo")
+    if data.visitor_role not in VISITOR_ROLES:
+        raise HTTPException(400, "Rol de visitante no válido")
+    id_number = (data.id_number or "").strip() or None
+
+    cambios = []
+    pares = (
+        ("nombres", visit.visitor_nombres, nombres),
+        ("apellidos", visit.visitor_apellidos, apellidos),
+        ("asunto", visit.subject, subject),
+        ("ID", visit.id_number, id_number),
+        ("rol", visit.visitor_role, data.visitor_role),
+        ("torre", visit.tower, tower),
+        ("apto", visit.apartment, apartment),
+    )
+    for etiqueta, antes, despues in pares:
+        if (antes or "") != despues:
+            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues}'")
+
+    visit.visitor_nombres = nombres
+    visit.visitor_apellidos = apellidos
+    visit.visitor_name = completo
+    visit.subject = subject
+    visit.id_number = id_number
+    visit.visitor_role = data.visitor_role
+    visit.tower = tower
+    visit.apartment = apartment
+    _registrar_edicion(db, "visita", visit.uuid, user, cambios)
+    db.commit()
+    log.info("visita_editada uuid=%s por=%s campos=%s", visit.uuid, user.username, len(cambios))
+    return {"ok": True, "message": "Visita actualizada", "visit": visit_dict(visit)}
+
+
+@router.patch("/packages/{package_uuid}/editar")
+def editar_paquete(
+    package_uuid: str,
+    data: EditarPaqueteIn,
+    user: User = Depends(require_api("guarda", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Edita un paquete de tercero (datos de la etiqueta). Mismas reglas de gracia."""
+    pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
+    if pkg is None or not pkg.tercero:
+        raise HTTPException(404, "Paquete no encontrado o no editable (solo terceros)")
+    if not _puede_editar(pkg.delivered_by or pkg.resident_id, pkg.created_at, user):
+        if (pkg.delivered_by or pkg.resident_id) != user.id:
+            raise HTTPException(403, "Solo quien registró el paquete puede editarlo (o administración)")
+        raise HTTPException(400, "Pasó el periodo de gracia de 1 hora; pide a administración que lo edite")
+
+    completo, nombres, apellidos = resolver_nombre(data.nombres, data.apellidos)
+    tower = data.tower.strip().upper()
+    apartment = data.apartment.strip()
+    if not tower or not apartment:
+        raise HTTPException(400, "Torre y apartamento son obligatorios")
+    if len(tower) > 10 or len(apartment) > 10:
+        raise HTTPException(400, "Torre o apartamento demasiado largos")
+    description = (data.description or "").strip() or None
+    if description and len(description) > 200:
+        raise HTTPException(400, "La descripción es demasiado larga")
+
+    cambios = []
+    pares = (
+        ("nombres", pkg.tercero_nombres, nombres),
+        ("apellidos", pkg.tercero_apellidos, apellidos),
+        ("torre", pkg.tower, tower),
+        ("apto", pkg.apartment, apartment),
+        ("descripción", pkg.description, description),
+    )
+    for etiqueta, antes, despues in pares:
+        if (antes or "") != despues:
+            cambios.append(f"{etiqueta}: '{antes or ''}' → '{despues}'")
+
+    pkg.tercero_nombres = nombres
+    pkg.tercero_apellidos = apellidos
+    pkg.nombre_tercero = completo
+    pkg.tower = tower
+    pkg.apartment = apartment
+    pkg.description = description
+    _registrar_edicion(db, "paquete", pkg.uuid, user, cambios)
+    db.commit()
+    log.info("paquete_editado uuid=%s por=%s campos=%s", pkg.uuid, user.username, len(cambios))
+    return {"ok": True, "message": "Paquete actualizado", "package": package_dict(pkg)}
 
 
 @router.post("/packages/manual")

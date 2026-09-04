@@ -49,3 +49,36 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
     show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
   }
 });
+
+// Edición de ingresos manuales (gracia de 1 hora)
+const editCard = document.getElementById("edit-visita-card");
+const editForm = document.getElementById("edit-visita-form");
+if (editCard && editForm) {
+  document.querySelectorAll("[data-editar-visita]").forEach(btn => btn.addEventListener("click", () => {
+    editForm.dataset.uuid = btn.dataset.editarVisita;
+    document.getElementById("edit-v-nombres").value = btn.dataset.nombres || "";
+    document.getElementById("edit-v-apellidos").value = btn.dataset.apellidos || "";
+    document.getElementById("edit-v-asunto").value = btn.dataset.asunto || "";
+    document.getElementById("edit-v-id").value = btn.dataset.idnum || "";
+    document.getElementById("edit-v-rol").value = btn.dataset.rol || "visitante";
+    document.getElementById("edit-v-torre").value = btn.dataset.torre || "";
+    document.getElementById("edit-v-apto").value = btn.dataset.apto || "";
+    editCard.classList.remove("hidden");
+    editCard.scrollIntoView({behavior: "smooth"});
+  }));
+  editForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await fetch("/api/visits/" + editForm.dataset.uuid + "/editar", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+      visitor_nombres: document.getElementById("edit-v-nombres").value.trim(),
+      visitor_apellidos: document.getElementById("edit-v-apellidos").value.trim(),
+      subject: document.getElementById("edit-v-asunto").value,
+      id_number: document.getElementById("edit-v-id").value,
+      visitor_role: document.getElementById("edit-v-rol").value,
+      tower: document.getElementById("edit-v-torre").value,
+      apartment: document.getElementById("edit-v-apto").value,
+    })});
+    const j = await r.json();
+    if (r.ok && j.ok) location.reload();
+    else alert(j.detail || "Error editando la visita");
+  });
+}

@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.utils import utcnow
@@ -9,6 +10,7 @@ VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
+MINUTOS_GRACIA_EDICION = 60  # el guarda puede editar lo suyo durante 1 hora
 
 
 class User(Base):
@@ -89,3 +91,18 @@ class Package(Base):
     # o se digita de la etiqueta (terceros). Se actualiza al asignar un residente.
     tower = Column(String(10))
     apartment = Column(String(10))
+
+
+class EditLog(Base):
+    """Control de ediciones: qué cambió, quién y cuándo, en datos manuales."""
+
+    __tablename__ = "edit_logs"
+
+    id = Column(Integer, primary_key=True)
+    entity_type = Column(String(10), nullable=False)  # visita | paquete
+    entity_uuid = Column(String(36), nullable=False, index=True)
+    editor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    creado_at = Column(DateTime, default=utcnow, nullable=False)
+    cambios = Column(Text, nullable=False)  # resumen legible: "asunto: 'x' → 'y'"
+
+    editor = relationship("User")

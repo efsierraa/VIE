@@ -62,11 +62,11 @@
   <div class="table-wrap">
   {% if visits %}
   <table>
-    <thead><tr><th>Visitante</th><th>Asunto</th><th>Destino</th><th>Autorizó</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th></tr></thead>
+    <thead><tr><th>Visitante</th><th>Asunto</th><th>Destino</th><th>Autorizó</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Duración</th><th>Registró</th><th></th></tr></thead>
     <tbody>
     {% for v in visits %}
     <tr>
-      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}</td>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}</td>
       <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td>{{ names.get(v.resident_id, "—") }}</td>
@@ -75,6 +75,7 @@
       <td>{{ v.exit_at|dt }}</td>
       <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
       <td>{{ names.get(v.entry_guard_id, "—") }}</td>
+      <td>{% if v.manual %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -103,14 +104,14 @@
     <tbody>
     {% for item in paquetes_hist %}
     <tr>
-      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.descripcion %}<br><span class="observacion" title="{{ item.descripcion }}">{{ item.descripcion }}</span>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
+      <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><span class="observacion" title="{{ item.descripcion }}">{{ item.descripcion }}</span>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
       <td>{{ item.destinatario }}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.p.confirmed_at|dt }}</td>
       <td>{{ item.entrego }}</td>
-      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button>{% endif %}</td>
+      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button> <button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -129,6 +130,77 @@
   {% endif %}
 </section>
 {% endif %}
+
+<h2>Control de ediciones</h2>
+<section class="card">
+  {% if logs %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fecha</th><th>Editó</th><th>Registro</th><th>Cambios</th></tr></thead>
+    <tbody>
+    {% for l in logs %}
+    <tr>
+      <td>{{ l.creado_at|dt }}</td>
+      <td>{{ l.editor.username }}</td>
+      <td>{{ labels.get(l.entity_uuid, "—") }}</td>
+      <td><span class="observacion" title="{{ l.cambios }}">{{ l.cambios }}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if pager_ed.anterior or pager_ed.siguiente %}
+  <p class="paginador">
+    {% if pager_ed.anterior %}<a class="small" href="{{ pager_ed.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_ed.pagina }}</span>
+    {% if pager_ed.siguiente %}<a class="small" href="{{ pager_ed.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
+  {% else %}
+  <p class="hint">No se han editado registros.</p>
+  {% endif %}
+</section>
+
+<section id="edit-visita-card" class="card hidden">
+  <h2>Editar ingreso manual</h2>
+  <form id="edit-visita-form" class="form">
+    <div class="row">
+      <label>Nombres <input id="edit-v-nombres" required maxlength="80"></label>
+      <label>Apellidos <input id="edit-v-apellidos" required maxlength="80"></label>
+    </div>
+    <label>Asunto <input id="edit-v-asunto" required maxlength="120"></label>
+    <label>Identificación (opcional) <input id="edit-v-id" maxlength="30"></label>
+    <label>Rol
+      <select id="edit-v-rol">
+        <option value="visitante">Visitante</option>
+        <option value="domiciliario">Domiciliario</option>
+      </select>
+    </label>
+    <div class="row">
+      <label>Torre <input id="edit-v-torre" required maxlength="10"></label>
+      <label>Apartamento <input id="edit-v-apto" required maxlength="10"></label>
+    </div>
+    <p class="hint">Toda edición queda registrada en el control de ediciones.</p>
+    <button type="submit">Guardar cambios</button>
+  </form>
+</section>
+
+<section id="edit-paquete-card" class="card hidden">
+  <h2>Editar paquete (no registrado)</h2>
+  <form id="edit-paquete-form" class="form">
+    <div class="row">
+      <label>Nombres <input id="edit-p-nombres" required maxlength="80"></label>
+      <label>Apellidos <input id="edit-p-apellidos" required maxlength="80"></label>
+    </div>
+    <div class="row">
+      <label>Torre <input id="edit-p-torre" required maxlength="10"></label>
+      <label>Apartamento <input id="edit-p-apto" required maxlength="10"></label>
+    </div>
+    <label>Descripción (opcional) <input id="edit-p-desc" maxlength="200"></label>
+    <p class="hint">Toda edición queda registrada en el control de ediciones.</p>
+    <button type="submit">Guardar cambios</button>
+  </form>
+</section>
 {% endblock %}
 
 {% block scripts %}

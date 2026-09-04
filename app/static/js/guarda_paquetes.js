@@ -186,3 +186,32 @@ document.getElementById("tercero-form").addEventListener("submit", async e => {
     renderTercero(p, resultados);
   }));
 });
+
+// Edición de paquetes de tercero (gracia de 1 hora)
+const editPkgCard = document.getElementById("edit-paquete-card");
+const editPkgForm = document.getElementById("edit-paquete-form");
+if (editPkgCard && editPkgForm) {
+  document.querySelectorAll("[data-editar-paquete]").forEach(btn => btn.addEventListener("click", () => {
+    editPkgForm.dataset.uuid = btn.dataset.editarPaquete;
+    document.getElementById("edit-p-nombres").value = btn.dataset.nombres || "";
+    document.getElementById("edit-p-apellidos").value = btn.dataset.apellidos || "";
+    document.getElementById("edit-p-torre").value = btn.dataset.torre || "";
+    document.getElementById("edit-p-apto").value = btn.dataset.apto || "";
+    document.getElementById("edit-p-desc").value = btn.dataset.desc || "";
+    editPkgCard.classList.remove("hidden");
+    editPkgCard.scrollIntoView({behavior: "smooth"});
+  }));
+  editPkgForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await fetch("/api/packages/" + editPkgForm.dataset.uuid + "/editar", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+      nombres: document.getElementById("edit-p-nombres").value.trim(),
+      apellidos: document.getElementById("edit-p-apellidos").value.trim(),
+      tower: document.getElementById("edit-p-torre").value,
+      apartment: document.getElementById("edit-p-apto").value,
+      description: document.getElementById("edit-p-desc").value,
+    })});
+    const j = await r.json();
+    if (r.ok && j.ok) location.reload();
+    else alert(j.detail || "Error editando el paquete");
+  });
+}
