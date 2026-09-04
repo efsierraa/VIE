@@ -22,7 +22,11 @@ Respondemos en un máximo de 7 días y publicamos el fix junto con un aviso.
 - Limitador de intentos contra fuerza bruta en login, escaneos y cambios de clave
 - Fotos de paquetes validadas y re-codificadas en el servidor (sin EXIF/GPS, reescalado forzado)
 - Cabeceras de seguridad (CSP, nosniff, X-Frame-Options, Referrer-Policy, HSTS en producción)
-- Eventos de seguridad en el log (logins fallidos, cambios de clave, altas/bajas de cuentas, entregas)
-- HTTPS obligatorio en producción; tráfico a la base de datos cifrado
+- Eventos de seguridad en el log JSON (logins, 2FA, cambios de clave, altas/bajas, reinicios 2FA, entregas)
+- Segundo factor TOTP obligatorio para administración (con códigos de respaldo de un solo uso); reinicio por otro admin con motivo auditado
+- Retención: fotos 30 días post-entrega; visitas finalizadas/canceladas 12 meses (`VIE_RETENTION_MONTHS`)
+- Salud pública `/health` + `X-Request-Id`; HTTPS obligatorio en producción; tráfico a la base cifrado
+
+Guía 2FA admin: [docs/2fa-admin.md](docs/2fa-admin.md). Políticas base (un edificio): [docs/soc2/](docs/soc2/). Respaldos: [docs/runbook-respaldos.md](docs/runbook-respaldos.md).
 
 Detalle completo en [auditoria_seguridad.md](auditoria_seguridad.md).

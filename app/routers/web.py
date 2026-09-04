@@ -15,9 +15,13 @@ from sqlalchemy.orm import Session
 from app.auth import (
     LoginRequired,
     PageForbidden,
+    clear_pre2fa,
+    create_pre2fa,
     create_session,
     current_user_or_none,
     destroy_session,
+    enforce_admin_2fa,
+    read_pre2fa,
     require_page,
     verify_password,
 )
@@ -223,10 +227,141 @@ def login(
         return templates.TemplateResponse(
             request, "login.html", {"user": None, "error": "Usuario o clave incorrectos"}
         )
+    # SOC2 CC6.1: admin exige segundo factor
+    if user.role == "admin" and enforce_admin_2fa():
+        if user.totp_enabled and user.totp_secret:
+            log.info("login_pw_ok_2fa_pendiente usuario=%s", user.username)
+            response = RedirectResponse("/login/2fa", status_code=303)
+            create_pre2fa(response, user.id)
+            return response
+        log.info("admin_sin_2fa_setup_requerido usuario=%s", user.username)
+        response = RedirectResponse("/login/2fa-setup", status_code=303)
+        create_pre2fa(response, user.id)
+        return response
     log.info("login_ok usuario=%s", user.username)
     response = RedirectResponse(HOME[user.role], status_code=303)
     create_session(response, user.id)
     return response
+
+
+def _pre2fa_user(request: Request, db: Session) -> User | None:
+    from app.auth import read_pre2fa as _read
+
+    uid = _read(request)
+    if uid is None:
+        return None
+    u = db.get(User, uid)
+    return u if u and u.active else None
+
+
+@router.get("/login/2fa", response_class=HTMLResponse)
+def login_2fa_page(request: Request, db: Session = Depends(get_db)):
+    user = _pre2fa_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "login_2fa.html", {"user": None})
+
+
+@router.post("/login/2fa")
+def login_2fa(
+    request: Request,
+    code: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    from app import totp as _totp
+
+    verificar_limite(request, "login-2fa", 5, 300)
+    user = _pre2fa_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    ok = False
+    if user.totp_secret and _totp.verificar(user.totp_secret, code):
+        ok = True
+    else:
+        # código de respaldo de un solo uso
+        import hashlib
+        import json
+
+        try:
+            guardados = json.loads(user.totp_backup_hashes or "[]")
+        except ValueError:
+            guardados = []
+        h = _totp.hash_respaldo(code)
+        if h in guardados:
+            guardados.remove(h)
+            user.totp_backup_hashes = json.dumps(guardados)
+            db.commit()
+            ok = True
+            log.info("login_2fa_respaldo_usado usuario=%s", user.username)
+    if not ok:
+        registrar_intento(request, "login-2fa")
+        log.warning("login_2fa_fallido usuario=%s", user.username)
+        return templates.TemplateResponse(
+            request, "login_2fa.html", {"user": None, "error": "Código incorrecto"}
+        )
+    log.info("login_2fa_ok usuario=%s", user.username)
+    response = RedirectResponse(HOME[user.role], status_code=303)
+    create_session(response, user.id)
+    clear_pre2fa(response)
+    return response
+
+
+@router.get("/login/2fa-setup", response_class=HTMLResponse)
+def login_2fa_setup_page(request: Request, db: Session = Depends(get_db)):
+    from app import totp as _totp
+
+    user = _pre2fa_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    if user.totp_enabled and user.totp_secret:
+        return RedirectResponse("/login/2fa", status_code=303)
+    if not user.totp_secret:
+        user.totp_secret = _totp.generar_secreto()
+        db.commit()
+    uri = _totp.uri_aprovisionamiento(user.totp_secret, user.username)
+    return templates.TemplateResponse(
+        request,
+        "login_2fa_setup.html",
+        {"user": None, "qr": qr_data_uri(uri), "secreto": user.totp_secret},
+    )
+
+
+@router.post("/login/2fa-setup")
+def login_2fa_setup(
+    request: Request,
+    code: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    import json
+
+    from app import totp as _totp
+
+    verificar_limite(request, "login-2fa", 5, 300)
+    user = _pre2fa_user(request, db)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    if not user.totp_secret or not _totp.verificar(user.totp_secret, code):
+        registrar_intento(request, "login-2fa")
+        log.warning("setup_2fa_fallido usuario=%s", user.username)
+        uri = _totp.uri_aprovisionamiento(user.totp_secret or "", user.username)
+        return templates.TemplateResponse(
+            request,
+            "login_2fa_setup.html",
+            {"user": None, "qr": qr_data_uri(uri), "secreto": user.totp_secret, "error": "Código incorrecto, intenta de nuevo"},
+        )
+    user.totp_enabled = True
+    respaldo = _totp.generar_respaldo()
+    user.totp_backup_hashes = json.dumps([_totp.hash_respaldo(c) for c in respaldo])
+    db.commit()
+    log.info("setup_2fa_ok usuario=%s", user.username)
+    response = RedirectResponse(HOME[user.role], status_code=303)
+    create_session(response, user.id)
+    clear_pre2fa(response)
+    # Los códigos solo se muestran una vez: van en la sesión flash vía cookie corta no-HttpOnly? No:
+    # se renderizan en la página de confirmación inmediata.
+    return templates.TemplateResponse(
+        request, "login_2fa_respaldo.html", {"user": user, "codigos": respaldo}
+    )
 
 
 @router.get("/logout")

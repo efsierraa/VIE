@@ -74,6 +74,8 @@ Abrir http://127.0.0.1:8000
 | `VIE_DATABASE_URL` | URL SQLAlchemy | `sqlite:///./vie.db` |
 | `VIE_SECRET` | Secreto para firmar QR y sesiones | `dev-secret-change-me` (¡cámbialo!) |
 | `VIE_COOKIE_SECURE` | `1` para cookies solo por HTTPS (producción) | `0` |
+| `VIE_RETENTION_MONTHS` | Meses de visitas finalizadas/canceladas antes de purgar | `12` |
+| `VIE_ENFORCE_ADMIN_2FA` | `1` exige TOTP a admin; `0` solo tests | `1` |
 
 ## Despliegue gratuito
 
@@ -140,9 +142,9 @@ Listo: entra a `https://vie-XXXX.onrender.com` con esa cuenta y crea los residen
 ## Seguridad
 
 - Claves con bcrypt (mínimo 8), sesiones firmadas con expiración, autorización por rol y por propietario
-- QR firmados con HMAC (sal separada por dominio), un solo uso, vigencia en base de datos
-- Limitador de fuerza bruta, cabeceras de seguridad (CSP, HSTS...), fotos validadas y sin EXIF en el servidor
-- Eventos de seguridad en el log; dependencias vigiladas con Dependabot
+- 2FA TOTP obligatorio para admin ([guía](docs/2fa-admin.md)), QR firmados con HMAC (sal separada), un solo uso
+- Limitador de fuerza bruta, cabeceras de seguridad (CSP, HSTS...), fotos validadas y sin EXIF
+- Logs JSON, `/health`, retención 12m visitas + 30d fotos, CI con pytest + pip-audit, respaldos verificados
 
 Auditoría completa y mapeo a SOC 2 / Ley 1581 en [auditoria_seguridad.md](auditoria_seguridad.md). Cómo reportar una vulnerabilidad: [SECURITY.md](SECURITY.md).
 

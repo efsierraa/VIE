@@ -688,6 +688,43 @@ def assign_password(
     return {"ok": True}
 
 
+class TwoFAReset(BaseModel):
+    motivo: str
+
+
+@router.post("/users/{user_id}/2fa/reset")
+def reset_2fa(
+    user_id: int,
+    data: TwoFAReset,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Reinicia el 2FA de un usuario (pérdida de teléfono). Con auditoría doble.
+
+    Limpia secreto + respaldo. El usuario repite la activación en su próximo login
+    (admin) o desde Mi perfil (otros roles). Queda en log estructurado y EditLog.
+    """
+    motivo = (data.motivo or "").strip()
+    if len(motivo) < 3:
+        raise HTTPException(400, "Indica el motivo (mínimo 3 caracteres)")
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "Usuario no encontrado")
+    user.totp_secret = None
+    user.totp_enabled = False
+    user.totp_backup_hashes = None
+    _registrar_edicion(
+        db,
+        "usuario",
+        user.username,
+        admin,
+        [f"2FA reiniciado por {admin.username}: {motivo}"],
+    )
+    db.commit()
+    log.info("2fa_reiniciado admin=%s destino=%s motivo=%s", admin.username, user.username, motivo)
+    return {"ok": True}
+
+
 @router.post("/me/password")
 def change_my_password(
     request: Request,
@@ -706,6 +743,100 @@ def change_my_password(
     db.commit()
     log.info("clave_cambiada usuario=%s", user.username)
     return {"ok": True}
+
+
+# --- 2FA TOTP (SOC2 CC6.1) ----------------------------------------------------
+
+class TwoFAVerify(BaseModel):
+    code: str
+
+
+class TwoFADisable(BaseModel):
+    actual: str
+
+
+@router.get("/me/2fa/status")
+def estado_2fa(user: User = Depends(require_api()), db: Session = Depends(get_db)):
+    import json
+
+    try:
+        restantes = len(json.loads(user.totp_backup_hashes or "[]"))
+    except ValueError:
+        restantes = 0
+    return {"enabled": bool(user.totp_enabled), "respaldos_restantes": restantes}
+
+
+@router.post("/me/2fa/setup/start")
+def iniciar_setup_2fa(user: User = Depends(require_api()), db: Session = Depends(get_db)):
+    from app import totp as _totp
+
+    if user.totp_enabled and user.totp_secret:
+        raise HTTPException(400, "El segundo factor ya está activo")
+    user.totp_secret = _totp.generar_secreto()
+    user.totp_enabled = False
+    db.commit()
+    uri = _totp.uri_aprovisionamiento(user.totp_secret, user.username)
+    log.info("setup_2fa_iniciado usuario=%s", user.username)
+    return {"otpauth_uri": uri, "qr_data_uri": qr_data_uri(uri), "secreto": user.totp_secret}
+
+
+@router.post("/me/2fa/setup/verify")
+def confirmar_setup_2fa(
+    data: TwoFAVerify,
+    user: User = Depends(require_api()),
+    db: Session = Depends(get_db),
+):
+    import json
+
+    from app import totp as _totp
+
+    if not user.totp_secret or not _totp.verificar(user.totp_secret, data.code):
+        log.warning("setup_2fa_fallido usuario=%s", user.username)
+        raise HTTPException(400, "Código incorrecto")
+    user.totp_enabled = True
+    respaldo = _totp.generar_respaldo()
+    user.totp_backup_hashes = json.dumps([_totp.hash_respaldo(c) for c in respaldo])
+    db.commit()
+    log.info("setup_2fa_ok usuario=%s", user.username)
+    return {"ok": True, "codigos_respaldo": respaldo}
+
+
+@router.post("/me/2fa/disable")
+def desactivar_2fa(
+    data: TwoFADisable,
+    user: User = Depends(require_api()),
+    db: Session = Depends(get_db),
+):
+    from app.auth import enforce_admin_2fa
+
+    if user.role == "admin" and enforce_admin_2fa():
+        raise HTTPException(400, "Administración exige segundo factor: no se puede desactivar")
+    if not verify_password(data.actual, user.password_hash):
+        raise HTTPException(400, "La clave actual es incorrecta")
+    user.totp_enabled = False
+    user.totp_secret = None
+    user.totp_backup_hashes = None
+    db.commit()
+    log.info("2fa_desactivado usuario=%s", user.username)
+    return {"ok": True}
+
+
+@router.post("/me/2fa/backup/regenerar")
+def regenerar_respaldo(
+    user: User = Depends(require_api()),
+    db: Session = Depends(get_db),
+):
+    import json
+
+    from app import totp as _totp
+
+    if not (user.totp_enabled and user.totp_secret):
+        raise HTTPException(400, "Activa primero el segundo factor")
+    respaldo = _totp.generar_respaldo()
+    user.totp_backup_hashes = json.dumps([_totp.hash_respaldo(c) for c in respaldo])
+    db.commit()
+    log.info("2fa_respaldo_regenerado usuario=%s", user.username)
+    return {"ok": True, "codigos_respaldo": respaldo}
 
 
 # --- Paquetes ---------------------------------------------------------------
@@ -844,6 +975,47 @@ def limpiar_fotos_vencidas(db: Session) -> int:
     if vencidos:
         db.commit()
     return len(vencidos)
+
+
+def purgar_visitas_antiguas(db: Session, meses: int | None = None) -> int:
+    """SOC2/CC + habeas data: purga visitas finalizadas/canceladas con más de N meses.
+
+    Solo estados terminales (finalizada/cancelada) y corte por created_at.
+    Los estados pendiente/dentro nunca se purgan (siguen vigentes/operativos).
+    Los EditLog se conservan como evidencia de auditoría.
+    Retorna el número de visitas eliminadas.
+    """
+    import os as _os
+
+    if meses is None:
+        try:
+            meses = int(_os.environ.get("VIE_RETENTION_MONTHS", "12"))
+        except ValueError:
+            meses = 12
+    corte = utcnow() - timedelta(days=30 * meses)
+    viejas = (
+        db.query(Visit)
+        .filter(Visit.status.in_(("finalizada", "cancelada")), Visit.created_at < corte)
+        .all()
+    )
+    n = len(viejas)
+    for v in viejas:
+        db.delete(v)
+    if n:
+        db.commit()
+        log.info("retencion_visitas_purgadas=%s meses=%s corte=%s", n, meses, corte.isoformat())
+    return n
+
+
+@router.post("/admin/retencion/ejecutar")
+def ejecutar_retencion(
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Ejecución manual de la purga de retención (la automática corre al arrancar)."""
+    n = purgar_visitas_antiguas(db)
+    log.info("retencion_manual por=%s purgadas=%s", admin.username, n)
+    return {"ok": True, "purgadas": n}
 
 
 @router.get("/packages/{package_uuid}/foto")

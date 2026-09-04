@@ -69,6 +69,18 @@ document.querySelectorAll("[data-reset]").forEach(btn => btn.addEventListener("c
   else { const j = await r.json(); alert(j.detail || "Error"); }
 }));
 
+document.querySelectorAll("[data-2fa-reset]").forEach(btn => btn.addEventListener("click", async e => {
+  e.preventDefault();
+  const motivo = prompt("Motivo del reinicio de 2FA para " + btn.dataset.nombre + " (queda auditado):");
+  if (motivo === null) return;
+  if (motivo.trim().length < 3) { alert("Indica el motivo (mínimo 3 caracteres)"); return; }
+  if (!confirm("Se borra el segundo factor de " + btn.dataset.nombre + ". Tendrá que activarlo de nuevo. ¿Continuar?")) return;
+  const r = await fetch("/api/users/" + btn.dataset["2faReset"] + "/2fa/reset", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({motivo: motivo.trim()})});
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) alert("2FA reiniciado. Quedó en el control de ediciones.");
+  else alert(j.detail || "Error reiniciando 2FA");
+}));
+
 document.getElementById("csv-form").addEventListener("submit", async e => {
   e.preventDefault();
   const archivo = document.getElementById("csv-file").files[0];

@@ -3,6 +3,7 @@ import os
 os.environ["VIE_DATABASE_URL"] = "sqlite:///./test_vie.db"
 os.environ["VIE_SECRET"] = "test-secret-vie"
 os.environ["VIE_RATE_LIMIT"] = "0"  # los tests hacen muchos intentos seguidos
+os.environ["VIE_ENFORCE_ADMIN_2FA"] = "0"  # los tests generales entran sin 2FA; test_2fa.py lo activa
 
 import pytest
 from fastapi.testclient import TestClient

@@ -16,6 +16,21 @@
     <label>Celular (opcional) <input name="celular" inputmode="tel" value="{{ user.celular or '' }}" placeholder="Ej: 300 123 4567"></label>
     <button type="submit">Guardar celular</button>
   </form>
+  <h2>Verificación en dos pasos</h2>
+  <p class="hint" id="2fa-estado">Cargando estado…</p>
+  <div id="2fa-acciones" class="form">
+    <button type="button" id="2fa-iniciar">Activar segundo factor</button>
+    <button type="button" id="2fa-regenerar" hidden>Regenerar códigos de respaldo</button>
+  </div>
+  <div id="2fa-setup" hidden>
+    <p class="center"><img id="2fa-qr" alt="QR para activar 2FA" width="220" height="220"></p>
+    <p class="hint">Secreto manual: <code id="2fa-secreto"></code></p>
+    <form id="2fa-form" class="form">
+      <label>Código de confirmación <input name="code" required inputmode="numeric" maxlength="6"></label>
+      <button type="submit">Confirmar</button>
+    </form>
+    <p class="hint" id="2fa-respaldo"></p>
+  </div>
   <h2>Cambiar mi clave</h2>
   <form id="pw-form" class="form">
     <label>Clave actual <input type="password" name="actual" required></label>

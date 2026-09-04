@@ -1,14 +1,41 @@
+import json
+import logging
 import os
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.database import Base, SessionLocal, engine
 from app.models import User
 from app.routers import api, web
+
+
+class _JsonFormatter(logging.Formatter):
+    """Logs JSON a stdout: Render los recoge; retención 7 días en plan gratis."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+                "level": record.levelname.lower(),
+                "logger": record.name,
+                "msg": record.getMessage(),
+            },
+            ensure_ascii=False,
+        )
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JsonFormatter())
+_vie_log = logging.getLogger("vie")
+_vie_log.handlers = [_handler]
+_vie_log.setLevel(logging.INFO)
+_vie_log.propagate = False
 
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
@@ -67,6 +94,17 @@ def _ensure_schema():
     if "celular" not in usr_cols:
         with engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE users ADD COLUMN celular VARCHAR(20)")
+    # 2FA TOTP (SOC2 CC6.1)
+    if "totp_secret" not in usr_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64)")
+    if "totp_enabled" not in usr_cols:
+        falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f"ALTER TABLE users ADD COLUMN totp_enabled BOOLEAN DEFAULT {falso} NOT NULL")
+    if "totp_backup_hashes" not in usr_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE users ADD COLUMN totp_backup_hashes TEXT")
     faltan_resolucion = {"resuelta_porteria", "resuelta_residente", "resuelta_at"} - pkg_cols
     if faltan_resolucion:
         falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
@@ -85,6 +123,7 @@ async def lifespan(app: FastAPI):
         api.limpiar_fotos_vencidas(db)
         api.auto_finalizar_visitas(db)  # salida automática de visitas cuyo QR ya expiró
         api.asignar_codigos_faltantes(db)  # paquetes viejos sin código (tercero pre-QR)
+        api.purgar_visitas_antiguas(db)  # SOC2/CC + habeas data: retención 12 meses
     yield
 
 
@@ -92,6 +131,27 @@ app = FastAPI(title="VIE — Vigilancia de Ingresos y Egresos", lifespan=lifespa
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web.router)
 app.include_router(api.router)
+
+
+@app.middleware("http")
+async def request_id(request: Request, call_next):
+    """Propaga X-Request-Id para correlacionar logs y respuestas."""
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
+    respuesta = await call_next(request)
+    respuesta.headers["X-Request-Id"] = rid
+    return respuesta
+
+
+@app.get("/health")
+def health() -> JSONResponse:
+    """Salud pública para Render/uptime: app + base de datos."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return JSONResponse({"ok": True, "db": "up"})
+    except Exception:
+        _vie_log.warning("health_db_down")
+        return JSONResponse({"ok": False, "db": "down"}, status_code=503)
 
 
 @app.middleware("http")

@@ -10,6 +10,7 @@ VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
+MESES_RETENCION_VISITAS = 12  # SOC2/CC + habeas data: visitas finalizadas/canceladas se purgan tras 12 meses
 MINUTOS_GRACIA_EDICION = 60  # el guarda puede editar lo suyo durante 1 hora
 HORAS_VISITA_MANUAL = 1  # el pase del ingreso manual vale 1 hora; más tiempo = registro del residente
 
@@ -28,6 +29,10 @@ class User(Base):
     apartment = Column(String(10))
     active = Column(Boolean, default=True, nullable=False)
     full_name = Column(String(120))  # legado: solo se usa para migrar datos viejos
+    # 2FA TOTP (SOC2 CC6.1): obligatorio para admin, opcional para el resto
+    totp_secret = Column(String(64))  # secreto base32; None = sin 2FA
+    totp_enabled = Column(Boolean, default=False, nullable=False)
+    totp_backup_hashes = Column(Text)  # JSON con sha256 de códigos de respaldo de un solo uso
 
     @property
     def nombre_completo(self) -> str:

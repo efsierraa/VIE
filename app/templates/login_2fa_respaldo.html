@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Guarda tus códigos — VIE{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Guarda tus códigos de respaldo</h1>
+  <p class="hint">Se muestran <strong>una sola vez</strong>. Guárdalos en un lugar seguro: cada uno sirve una vez si pierdes el teléfono.</p>
+  <ul class="codigos">
+    {% for c in codigos %}<li><code>{{ c }}</code></li>{% endfor %}
+  </ul>
+  <p><a class="btn" href="/">Entrar a VIE</a></p>
+</section>
+{% endblock %}

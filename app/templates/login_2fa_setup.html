@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Activa tu segundo factor — VIE{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Activa tu segundo factor</h1>
+  <p class="hint">La administración exige verificación en dos pasos. Escanea este QR con tu app (Google Authenticator, Authy, 1Password…) y luego ingresa el código de 6 dígitos.</p>
+  {% if error %}<p class="alert error">{{ error }}</p>{% endif %}
+  <p class="center"><img src="{{ qr }}" alt="QR para activar 2FA" width="220" height="220"></p>
+  <p class="hint">Si no puedes escanear, ingresa este secreto a mano: <code>{{ secreto }}</code></p>
+  <form method="post" action="/login/2fa-setup" class="form">
+    <label>Código de confirmación <input name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus></label>
+    <button type="submit">Activar y entrar</button>
+  </form>
+</section>
+{% endblock %}
