@@ -42,6 +42,7 @@ templates = Jinja2Templates(directory="app/templates")
 BOGOTA = ZoneInfo("America/Bogota")
 
 HOME = {"admin": "/admin", "guarda": "/guarda", "residente": "/residente"}
+templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
 
 NAVEGACION = {
     "guarda": [

@@ -14,7 +14,7 @@
   <a class="brand" href="/">VIE</a>
   <nav>
     {% if user %}
-    <span class="chip role-{{ user.role }}">{{ user.nombre_completo }} · {{ user.role }}</span>
+    <a class="chip role-{{ user.role }}" href="{{ HOME[user.role] }}" title="Ir al inicio">{{ user.nombre_completo }} · {{ user.role }}</a>
     <a class="link" href="/cuenta">Mi perfil</a>
     <a class="link" href="/logout">Salir</a>
     {% endif %}
