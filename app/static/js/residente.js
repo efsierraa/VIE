@@ -40,13 +40,6 @@ function mostrarPase(j) {
   const dl = document.getElementById("btn-download");
   dl.href = j.qr_data_uri;
   dl.download = "pase-vie-" + j.visit.short_code + ".png";
-  const v = j.visit;
-  const text = "Pase de ingreso VIE\n" +
-    "Visitante: " + v.visitor_name + "\n" +
-    "Asunto: " + v.subject + "\n" +
-    "Torre " + v.tower + " — Apto " + v.apartment + "\n" +
-    "Código para portería: " + v.short_code + "\n" +
-    "Un solo uso.";
   document.getElementById("btn-share").onclick = async () => {
     let compartido = false;
     try {
