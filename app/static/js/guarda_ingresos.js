@@ -56,12 +56,11 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
       '<div class="qr-box"><img src="' + j.qr_data_uri + '" alt="QR del pase"></div>' +
       '<p class="short-code">Código para portería: <strong>' + esc(v.short_code) + '</strong></p>' +
       '<p class="hint">El pase es válido por 1 hora: sirve para marcar la salida y, si nadie la marca, se marca sola al vencer. Para visitas más largas, un residente debe registrarlo.</p>' +
-      '<div class="row">' + btnWa + '<a class="button" download="pase-vie-' + esc(v.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a><button type="button" id="btn-listo">Listo</button></div>');
+      '<div class="row">' + btnWa + '<a class="button" download="pase-vie-' + esc(v.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a></div>');
     e.target.reset();
     if (v.visitor_celular) {
       document.getElementById("btn-wa-manual").addEventListener("click", () => compartirPase(j.qr_data_uri, texto, "pase-vie-" + v.short_code + ".png"));
     }
-    document.getElementById("btn-listo").addEventListener("click", () => location.reload());
   } else {
     show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
   }
@@ -95,7 +94,6 @@ if (paseCard) {
     paseCard.classList.remove("hidden");
     paseCard.scrollIntoView({behavior: "smooth"});
   }));
-  document.getElementById("pase-listo").addEventListener("click", () => paseCard.classList.add("hidden"));
 }
 
 // Edición de ingresos manuales (gracia de 1 hora)

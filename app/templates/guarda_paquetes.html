@@ -133,6 +133,7 @@
 </section>
 
 <section id="edit-paquete-card" class="card hidden">
+  <button type="button" class="cerrar-tarjeta" data-cerrar="edit-paquete-card" aria-label="Cerrar">✕</button>
   <h2>Editar paquete (no registrado)</h2>
   <form id="edit-paquete-form" class="form">
     <div class="row">
@@ -151,6 +152,7 @@
 </section>
 
 <section id="pkg-pase-card" class="card hidden">
+  <button type="button" class="cerrar-tarjeta" data-cerrar="pkg-pase-card" aria-label="Cerrar">✕</button>
   <h2>QR de reclamo del paquete</h2>
   <div class="qr-box"><img id="pkg-pase-img" alt="QR del paquete"></div>
   <p class="short-code">Código: <strong id="pkg-pase-codigo"></strong></p>
@@ -158,7 +160,6 @@
   <div class="row">
     <button id="pkg-pase-wa" type="button" class="hidden">Enviar por WhatsApp</button>
     <a id="pkg-pase-descargar" class="button" download="paquete-vie.png">Descargar QR</a>
-    <button id="pkg-pase-listo" type="button">Listo</button>
   </div>
 </section>
 {% endblock %}

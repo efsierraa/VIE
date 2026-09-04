@@ -84,6 +84,7 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         api.limpiar_fotos_vencidas(db)
         api.auto_finalizar_visitas(db)  # salida automática de visitas cuyo QR ya expiró
+        api.asignar_codigos_faltantes(db)  # paquetes viejos sin código (tercero pre-QR)
     yield
 
 

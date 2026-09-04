@@ -781,6 +781,18 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
     return d
 
 
+def asignar_codigos_faltantes(db: Session) -> int:
+    """Asigna código corto a paquetes sin él (creados antes de que los tercero
+    tuvieran QR de reclamo). Idempotente: los que ya tienen código no se tocan."""
+    huerfanos = db.query(Package).filter(Package.short_code.is_(None)).all()
+    for p in huerfanos:
+        p.short_code = _codigo_unico(db, Package)
+    if huerfanos:
+        db.commit()
+        log.info("codigos_asignados=%s", len(huerfanos))
+    return len(huerfanos)
+
+
 def auto_finalizar_visitas(db: Session) -> int:
     """Salida automática: una visita 'dentro' cuyo QR ya expiró se cierra sola.
 
@@ -1325,10 +1337,9 @@ def mis_paquetes(user: User = Depends(require_api("residente")), db: Session = D
         if p.status == "en_porteria":
             if p.photo:
                 d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
-            d["qr_data_uri"] = qr_pase_data_uri(
-                sign_package(p.uuid),
-                [f"Código: {p.short_code}", f"Paquete de: {user.nombre_completo}"],
-            )
+            lineas = [f"Código: {p.short_code}"] if p.short_code else []
+            lineas.append(f"Paquete de: {user.nombre_completo}")
+            d["qr_data_uri"] = qr_pase_data_uri(sign_package(p.uuid), lineas)
         out.append(d)
     pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
     return {"ok": True, "pendientes": pendientes, "packages": out}
@@ -1350,11 +1361,14 @@ def paquete_pass(
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
     token = sign_package(pkg.uuid)
+    lineas = []
+    if pkg.short_code:
+        lineas.append(f"Código: {pkg.short_code}")
     if pkg.tercero:
-        lineas = [f"Código: {pkg.short_code}", f"Paquete de: {pkg.nombre_tercero}", f"T{pkg.tower} · {pkg.apartment}"]
+        lineas += [f"Paquete de: {pkg.nombre_tercero}", f"T{pkg.tower} · {pkg.apartment}"]
     else:
         residente = db.get(User, pkg.resident_id)
-        lineas = [f"Código: {pkg.short_code}", f"Paquete de: {residente.nombre_completo if residente else '—'}"]
+        lineas.append(f"Paquete de: {residente.nombre_completo if residente else '—'}")
     return {
         "ok": True,
         "token": token,

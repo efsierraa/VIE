@@ -278,5 +278,4 @@ if (pkgPaseCard) {
     pkgPaseCard.classList.remove("hidden");
     pkgPaseCard.scrollIntoView({behavior: "smooth"});
   }));
-  document.getElementById("pkg-pase-listo").addEventListener("click", () => pkgPaseCard.classList.add("hidden"));
 }
