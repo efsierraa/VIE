@@ -93,9 +93,17 @@ def test_ver_qr_de_visita_pendiente(client):
     assert r.json()["qr_data_uri"].startswith("data:image/png;base64,")
     assert r.json()["visit"]["short_code"] == code
 
-    # tras usarse, ya no se puede reabrir
+    # tras usarse (visita dentro) el pase sigue disponible para verlo y compartirlo
     login(client, "guarda1")
     client.post("/api/scan", json={"code": code, "action": "entrada"})
+    login(client, "residente1")
+    r = client.get(f"/api/visits/{visit_uuid}/pass")
+    assert r.status_code == 200
+    assert r.json()["visit"]["status"] == "dentro"
+
+    # ya finalizada o cancelada, ya no se puede reabrir
+    login(client, "guarda1")
+    client.post("/api/scan", json={"code": code, "action": "salida"})
     login(client, "residente1")
     r = client.get(f"/api/visits/{visit_uuid}/pass")
     assert r.status_code == 400

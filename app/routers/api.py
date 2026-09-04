@@ -268,11 +268,14 @@ def visit_pass(
     user: User = Depends(require_api("residente")),
     db: Session = Depends(get_db),
 ):
-    """Vuelve a mostrar el pase (QR + código corto) de una visita pendiente."""
+    """Vuelve a mostrar el pase (QR + código corto) de una visita pendiente o dentro.
+
+    Una visita 'dentro' conserva el pase: el guarda puede usar el QR para marcar
+    la salida y el residente puede re-ver y re-compartir la información."""
     visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
     if visit is None or visit.resident_id != user.id:
         raise HTTPException(404, "Visita no encontrada")
-    if visit.status != "pendiente":
+    if visit.status not in ("pendiente", "dentro"):
         raise HTTPException(400, "Este pase ya fue usado o cancelado")
     token = sign_visit(visit.uuid)
     return {"ok": True, "token": token, "qr_data_uri": qr_data_uri(token), "visit": visit_dict(visit)}

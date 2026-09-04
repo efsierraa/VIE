@@ -15,6 +15,14 @@ function mostrarPase(j) {
   document.getElementById("qr-img").src = j.qr_data_uri;
   document.getElementById("token").textContent = j.token;
   document.getElementById("short-code").textContent = j.visit.short_code;
+  const nota = document.getElementById("pase-nota");
+  if (j.visit.status === "dentro") {
+    nota.textContent = "La visita ya ingresó. El QR sigue sirviendo para marcar la salida, y puedes compartir el pase para mostrar la información en portería.";
+    nota.classList.remove("hidden");
+  } else {
+    nota.textContent = "";
+    nota.classList.add("hidden");
+  }
   const dl = document.getElementById("btn-download");
   dl.href = j.qr_data_uri;
   dl.download = "pase-vie-" + j.visit.short_code + ".png";

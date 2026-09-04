@@ -56,6 +56,7 @@
 <section id="result" class="card hidden">
   <h2>Pase listo para enviar</h2>
   <div class="qr-box"><img id="qr-img" alt="QR de ingreso"></div>
+  <p class="hint" id="pase-nota"></p>
   <p class="hint">El QR es de un solo uso. El guarda lo escanea a la entrada y, si quiere, marca la salida.</p>
   <p class="short-code">Código para portería: <strong id="short-code"></strong></p>
   <details>
@@ -85,8 +86,10 @@
         <td>{{ v.created_at|dt }}</td>
         <td>{{ v.expires_at|dt }}</td>
         <td>
-          {% if v.status == "pendiente" %}
+          {% if v.status in ("pendiente", "dentro") %}
           <button class="small" data-verqr="{{ v.uuid }}">Ver QR</button>
+          {% endif %}
+          {% if v.status == "pendiente" %}
           <button class="small danger" data-cancel="{{ v.uuid }}">Cancelar</button>
           {% endif %}
         </td>
