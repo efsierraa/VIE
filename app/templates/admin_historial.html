@@ -5,9 +5,9 @@
 
 <section class="card">
   <div class="tipo-links">
-    <a class="small {{ 'activa' if tipo == 'ingresos' else '' }}" href="/admin/historial?tipo=ingresos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}">Ingresos</a>
-    <a class="small {{ 'activa' if tipo == 'paquetes' else '' }}" href="/admin/historial?tipo=paquetes&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}">Paquetes</a>
-    <a class="small {{ 'activa' if tipo == 'ambos' else '' }}" href="/admin/historial?tipo=ambos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}">Ambos</a>
+    <a class="small {{ 'activa' if tipo == 'ingresos' else '' }}" href="/admin/historial?tipo=ingresos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Ingresos</a>
+    <a class="small {{ 'activa' if tipo == 'paquetes' else '' }}" href="/admin/historial?tipo=paquetes&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Paquetes</a>
+    <a class="small {{ 'activa' if tipo == 'ambos' else '' }}" href="/admin/historial?tipo=ambos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Ambos</a>
   </div>
 
   <form method="get" action="/admin/historial" class="form filters">
@@ -16,9 +16,8 @@
       <label>{{ "Fecha de entrada" if tipo != "paquetes" else "Fecha de registro" }}
         <input type="date" name="fecha" value="{{ f_fecha }}">
       </label>
-      {% if tipo != "paquetes" %}
       <label>Torre <input name="torre" value="{{ f_torre }}" size="3"></label>
-      {% endif %}
+      <label>Apartamento <input name="apto" value="{{ f_apto }}" size="5"></label>
     </div>
     <div class="row">
       <label>Estado

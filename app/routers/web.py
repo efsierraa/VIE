@@ -447,6 +447,7 @@ def admin_historial_page(
     estado: str = "",
     q: str = "",
     torre: str = "",
+    apto: str = "",
     pagina_v: str = "1",
     pagina_p: str = "1",
     pagina_ed: str = "1",
@@ -486,8 +487,10 @@ def admin_historial_page(
                 query = query.filter(or_(Visit.visitor_name.ilike(like), Visit.subject.ilike(like)))
         if torre.strip():
             query = query.filter(Visit.tower == torre.strip().upper())
+        if apto.strip():
+            query = query.filter(Visit.apartment == apto.strip())
         visits, v_ant, v_sig = paginar(query, _pagina(pagina_v), 50)
-        pager_ingresos = pager(_pagina(pagina_v), v_ant, v_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q, "torre": torre}, "pagina_v")
+        pager_ingresos = pager(_pagina(pagina_v), v_ant, v_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q, "torre": torre, "apto": apto}, "pagina_v")
 
     pkgs = []
     pager_paquetes = pager(1, False, False, "/admin/historial", {}, "pagina_p")
@@ -508,8 +511,12 @@ def admin_historial_page(
                         Package.short_code.ilike(like),
                     )
                 )
+        if torre.strip():
+            query = query.filter(Package.tower == torre.strip().upper())
+        if apto.strip():
+            query = query.filter(Package.apartment == apto.strip())
         pkgs, p_ant, p_sig = paginar(query, _pagina(pagina_p), 50)
-        pager_paquetes = pager(_pagina(pagina_p), p_ant, p_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q}, "pagina_p")
+        pager_paquetes = pager(_pagina(pagina_p), p_ant, p_sig, "/admin/historial", {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q, "torre": torre, "apto": apto}, "pagina_p")
 
     paquetes_hist = paquetes_con_nombres(db, pkgs) if pkgs else []
     uids = {v.uuid for v in visits} | {i["p"].uuid for i in paquetes_hist}
@@ -563,6 +570,7 @@ def admin_historial_page(
             "f_estado": estado,
             "f_q": q,
             "f_torre": torre,
+            "f_apto": apto,
             "tabs": nav_de("admin", "historial"),
         },
     )
