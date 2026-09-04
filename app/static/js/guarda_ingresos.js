@@ -42,13 +42,34 @@ document.getElementById("manual-form").addEventListener("submit", async e => {
   const r = await fetch("/api/visits/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)});
   const j = await r.json();
   if (r.ok && j.ok) {
-    show('<p class="alert ok">' + esc(j.message) + ': ' + esc(j.visit.visitor_name) + ' → Torre ' + esc(j.visit.tower) + ' · Apto ' + esc(j.visit.apartment) + '</p>');
+    show('<p class="alert ok">' + esc(j.message) + '. Entrega el pase al visitante:</p>' +
+      '<div class="qr-box"><img src="' + j.qr_data_uri + '" alt="QR del pase"></div>' +
+      '<p class="short-code">Código para portería: <strong>' + esc(j.visit.short_code) + '</strong></p>' +
+      '<p class="hint">El pase es válido por 1 hora: sirve para marcar la salida y, si nadie la marca, se marca sola al vencer. Para visitas más largas, un residente debe registrarlo.</p>' +
+      '<div class="row"><a class="button" download="pase-vie-' + esc(j.visit.short_code) + '.png" href="' + j.qr_data_uri + '">Descargar QR</a><button type="button" id="btn-listo">Listo</button></div>');
     e.target.reset();
-    setTimeout(() => location.reload(), 2500);
+    document.getElementById("btn-listo").addEventListener("click", () => location.reload());
   } else {
     show('<p class="alert error">' + esc(j.detail || "Error") + '</p>');
   }
 });
+
+// Ver y reenviar el pase de una visita activa (pendiente o dentro)
+const paseCard = document.getElementById("pase-card");
+if (paseCard) {
+  document.querySelectorAll("[data-verqr]").forEach(btn => btn.addEventListener("click", async () => {
+    const r = await fetch("/api/visits/" + btn.dataset.verqr + "/pass");
+    const j = await r.json();
+    if (!(r.ok && j.ok)) { alert(j.detail || "No se pudo abrir el pase"); return; }
+    document.getElementById("pase-img").src = j.qr_data_uri;
+    document.getElementById("pase-codigo").textContent = j.visit.short_code;
+    document.getElementById("pase-descargar").href = j.qr_data_uri;
+    document.getElementById("pase-descargar").download = "pase-vie-" + j.visit.short_code + ".png";
+    paseCard.classList.remove("hidden");
+    paseCard.scrollIntoView({behavior: "smooth"});
+  }));
+  document.getElementById("pase-listo").addEventListener("click", () => paseCard.classList.add("hidden"));
+}
 
 // Edición de ingresos manuales (gracia de 1 hora)
 const editCard = document.getElementById("edit-visita-card");

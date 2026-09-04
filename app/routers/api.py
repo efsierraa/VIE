@@ -20,6 +20,7 @@ from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
 from app.models import (
     DIAS_FOTO_ENTREGADA,
+    HORAS_VISITA_MANUAL,
     MINUTOS_GRACIA_EDICION,
     ROLES,
     VALID_HOURS,
@@ -267,15 +268,18 @@ def cancel_visit(
 @router.get("/visits/{visit_uuid}/pass")
 def visit_pass(
     visit_uuid: str,
-    user: User = Depends(require_api("residente")),
+    user: User = Depends(require_api("residente", "guarda", "admin")),
     db: Session = Depends(get_db),
 ):
     """Vuelve a mostrar el pase (QR + código corto) de una visita pendiente o dentro.
 
-    Una visita 'dentro' conserva el pase: el guarda puede usar el QR para marcar
-    la salida y el residente puede re-ver y re-compartir la información."""
+    El residente solo las suyas; el guarda y administración, cualquier visita activa —
+    para re-mostrar el pase cuando el visitante lo perdió. Una visita 'dentro'
+    conserva el pase: el QR sirve para marcar la salida."""
     visit = db.query(Visit).filter(Visit.uuid == visit_uuid).first()
-    if visit is None or visit.resident_id != user.id:
+    if visit is None:
+        raise HTTPException(404, "Visita no encontrada")
+    if user.role == "residente" and visit.resident_id != user.id:
         raise HTTPException(404, "Visita no encontrada")
     if visit.status not in ("pendiente", "dentro"):
         raise HTTPException(400, "Este pase ya fue usado o cancelado")
@@ -418,14 +422,21 @@ def manual_entry(
         apartment=apartment,
         status="dentro",
         manual=True,
-        expires_at=utcnow() + timedelta(hours=24),
+        expires_at=utcnow() + timedelta(hours=HORAS_VISITA_MANUAL),
         entry_at=utcnow(),
         entry_guard_id=guard.id,
     )
     db.add(visit)
     db.commit()
     db.refresh(visit)
-    return {"ok": True, "message": "Entrada manual registrada", "visit": visit_dict(visit)}
+    token = sign_visit(visit.uuid)
+    return {
+        "ok": True,
+        "message": "Entrada manual registrada",
+        "token": token,
+        "qr_data_uri": qr_data_uri(token),
+        "visit": visit_dict(visit),
+    }
 
 
 # --- Administración --------------------------------------------------------

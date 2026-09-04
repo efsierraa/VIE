@@ -11,6 +11,7 @@ VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
 MINUTOS_GRACIA_EDICION = 60  # el guarda puede editar lo suyo durante 1 hora
+HORAS_VISITA_MANUAL = 1  # el pase del ingreso manual vale 1 hora; más tiempo = registro del residente
 
 
 class User(Base):

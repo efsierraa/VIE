@@ -33,15 +33,16 @@
   <div class="table-wrap">
   {% if activas %}
   <table>
-    <thead><tr><th>Visitante</th><th>Destino</th><th>Entrada</th><th>Vence</th><th>Estado</th></tr></thead>
+    <thead><tr><th>Visitante</th><th>Destino</th><th>Entrada</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
     <tbody>
     {% for v in activas %}
     <tr>
-      <td>{{ v.visitor_name }}</td>
+      <td>{{ v.visitor_name }}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}</td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td>{{ v.entry_at|dt }}</td>
       <td>{{ v.expires_at|dt }}{% if v|extendida %} <span class="chip extendida">extendida</span>{% endif %}</td>
       <td><span class="chip status-dentro">activa</span></td>
+      <td>{% if v.status in ("pendiente", "dentro") %}<button class="small" data-verqr="{{ v.uuid }}">Ver QR</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -78,6 +79,7 @@
       <label>Torre <input name="tower" required></label>
       <label>Apartamento <input name="apartment" required></label>
     </div>
+    <p class="hint">Al registrar la entrada, el visitante recibe un pase (QR y código) válido por <strong>1 hora</strong>: es su identificación y sirve para marcar la salida. Si necesita quedarse más tiempo, un residente debe registrarlo desde la app.</p>
     <button type="submit">Registrar entrada manual</button>
   </form>
 </details>
@@ -91,7 +93,7 @@
     <tbody>
     {% for v in visits %}
     <tr>
-      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}</td>
+      <td>{{ v.visitor_name }}{% if v.manual %} <span class="chip manual">manual</span>{% endif %}{% if v.uuid in editados %} <span class="chip editada">editada</span>{% endif %}{% if v.short_code %}<br><small class="mono">{{ v.short_code }}</small>{% endif %}</td>
       <td><span class="observacion" title="{{ v.subject }}">{{ v.subject }}</span></td>
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
@@ -99,7 +101,7 @@
       <td>{{ v.exit_at|dt }}{% if v.salida_auto %}<br><small class="auto">salida automática</small>{% endif %}</td>
       <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
       <td>{{ names.get(v.entry_guard_id, "—") }}</td>
-      <td>{% if v.uuid in editables %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
+      <td>{% if v.status in ("pendiente", "dentro") %}<button class="small" data-verqr="{{ v.uuid }}">Ver QR</button> {% endif %}{% if v.uuid in editables %}<button class="small" data-editar-visita="{{ v.uuid }}" data-nombres="{{ v.visitor_nombres or '' }}" data-apellidos="{{ v.visitor_apellidos or '' }}" data-asunto="{{ v.subject }}" data-idnum="{{ v.id_number or '' }}" data-rol="{{ v.visitor_role }}" data-torre="{{ v.tower }}" data-apto="{{ v.apartment }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
@@ -118,8 +120,7 @@
 </section>
 
 <section id="edit-visita-card" class="card hidden">
-  <h2>Editar ingreso manual</h2>
-  <form id="edit-visita-form" class="form">
+  <h2>Editar ingreso manual</h2>  <form id="edit-visita-form" class="form">
     <div class="row">
       <label>Nombres <input id="edit-v-nombres" required maxlength="80"></label>
       <label>Apellidos <input id="edit-v-apellidos" required maxlength="80"></label>
@@ -139,6 +140,17 @@
     <p class="hint">Puedes editar durante 1 hora desde el ingreso. Toda edición queda registrada.</p>
     <button type="submit">Guardar cambios</button>
   </form>
+</section>
+
+<section id="pase-card" class="card hidden">
+  <h2>Pase de la visita</h2>
+  <div class="qr-box"><img id="pase-img" alt="QR de la visita"></div>
+  <p class="short-code">Código para portería: <strong id="pase-codigo"></strong></p>
+  <p class="hint">Muéstralo o reenvíalo al visitante mientras la visita esté activa: el QR sirve para marcar la salida.</p>
+  <div class="row">
+    <a id="pase-descargar" class="button" download="pase-vie.png">Descargar QR</a>
+    <button id="pase-listo" type="button">Listo</button>
+  </div>
 </section>
 {% endblock %}
 

@@ -194,6 +194,7 @@ td small { color: var(--gris-texto); }
   font-size: 0.75rem;
 }
 .short-code { margin: 0.4rem 0; }
+small.mono { font-family: monospace; letter-spacing: 0.12em; color: var(--gris-texto); }
 .short-code strong {
   display: inline-block;
   font-size: 1.5rem;
