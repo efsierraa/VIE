@@ -8,3 +8,4 @@ venv/
 .DS_Store
 secrets.txt
 VIE_feedback/*
+costo-mensual-1000-aptos.txt
