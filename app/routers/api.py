@@ -926,10 +926,13 @@ def editar_paquete(
     user: User = Depends(require_api("guarda", "admin")),
     db: Session = Depends(get_db),
 ):
-    """Edita un paquete de tercero (datos de la etiqueta). Mismas reglas de gracia."""
+    """Edita un paquete de tercero mientras sigue en portería. Solo cambia la
+    información (nunca confirma la entrega). Mismas reglas de gracia."""
     pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
     if pkg is None or not pkg.tercero:
         raise HTTPException(404, "Paquete no encontrado o no editable (solo terceros)")
+    if pkg.status != "en_porteria":
+        raise HTTPException(400, "El paquete ya fue entregado o cancelado: su información ya no se puede editar")
     if not _puede_editar(pkg.delivered_by or pkg.resident_id, pkg.created_at, user):
         if (pkg.delivered_by or pkg.resident_id) != user.id:
             raise HTTPException(403, "Solo quien registró el paquete puede editarlo (o administración)")

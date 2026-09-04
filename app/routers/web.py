@@ -102,8 +102,8 @@ def editable_visita(v, user_id: int) -> bool:
 
 
 def editable_paquete(p, user_id: int) -> bool:
-    """El guarda puede editar su paquete de tercero durante el periodo de gracia."""
-    if not p.tercero:
+    """El guarda puede editar su paquete de tercero mientras siga en portería."""
+    if not p.tercero or p.status != "en_porteria":
         return False
     if (p.delivered_by or p.resident_id) != user_id:
         return False

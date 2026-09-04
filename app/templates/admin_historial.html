@@ -111,7 +111,7 @@
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.p.confirmed_at|dt }}</td>
       <td>{{ item.entrego }}</td>
-      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button> <button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
+      <td>{% if item.p.tercero and item.p.status != "cancelado" %}<button class="small" data-asignar="{{ item.p.uuid }}" data-nombre="{{ item.p.nombre_tercero }}">Asignar a residente</button>{% endif %} {% if item.p.tercero and item.p.status == "en_porteria" %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>

@@ -247,6 +247,53 @@ def _fila_ingreso(client, nombre: str) -> str:
     return ""
 
 
+def test_paquete_entregado_no_editable(client):
+    """Una vez entregado, la información del paquete queda congelada (ni guarda ni admin)."""
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombres": "Congelado", "apellidos": "Tras Entrega", "tower": "4", "apartment": "1005", "photo_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+
+    # entrega con cédula
+    r = client.post(f"/api/packages/{pkg['uuid']}/entregar", json={"cedula": "123456789"})
+    assert r.status_code == 200
+
+    for quien in ("guarda1", "admin1"):
+        login(client, quien)
+        r = client.patch(
+            f"/api/packages/{pkg['uuid']}/editar",
+            json={"nombres": "Cambio", "apellidos": "Prohibido", "tower": "4", "apartment": "1005"},
+        )
+        assert r.status_code == 400
+        assert "entregado" in r.json()["detail"]
+
+    # la información quedó intacta
+    db = SessionLocal()
+    from app.models import Package
+    p = db.query(Package).filter(Package.uuid == pkg["uuid"]).first()
+    assert p.nombre_tercero == "Congelado Tras Entrega"
+    db.close()
+
+
+def test_editar_paquete_no_confirma_entrega(client):
+    """Editar solo cambia la información: el paquete sigue en portería."""
+    login(client, "guarda1")
+    r = client.post(
+        "/api/packages/manual",
+        json={"nombres": "Sin", "apellidos": "Confirmar", "tower": "3", "apartment": "301", "photo_b64": FOTO},
+    )
+    pkg = r.json()["package"]
+
+    r = client.patch(
+        f"/api/packages/{pkg['uuid']}/editar",
+        json={"nombres": "Sin", "apellidos": "Confirmar Igual", "tower": "3", "apartment": "301"},
+    )
+    assert r.status_code == 200
+    assert r.json()["package"]["status"] == "en_porteria"  # la edición no entrega
+
+
 def test_boton_editar_visible_solo_en_gracia(client):
     visit = _visita_manual(client, "Boton", "Gracia")
     login(client, "guarda1")
