@@ -219,7 +219,7 @@ td small { color: var(--gris-texto); }
 /* Resultado del escaneo */
 .reader { width: 100%; max-width: 340px; margin: 0 auto 0.8rem; }
 .qr-box { text-align: center; margin: 0.5rem 0; }
-.qr-box img { width: 220px; height: 220px; border: 1px solid var(--gris-borde); border-radius: 8px; }
+.qr-box img { width: 220px; height: auto; border: 1px solid var(--gris-borde); border-radius: 8px; }
 .token {
   display: block;
   word-break: break-all;
