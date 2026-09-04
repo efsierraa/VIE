@@ -73,6 +73,16 @@ templates.env.filters["fdate"] = fmt_date
 templates.env.filters["dur"] = format_duration
 
 
+def es_extendida(v) -> bool:
+    """Visita extendida: vigencia mayor a 24 horas."""
+    if not v.expires_at or not v.created_at:
+        return False
+    return (v.expires_at - v.created_at) > timedelta(hours=24)
+
+
+templates.env.filters["extendida"] = es_extendida
+
+
 def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
     ids = {v.resident_id for v in visits} | {v.entry_guard_id for v in visits} | {v.exit_guard_id for v in visits}
     ids.discard(None)
@@ -263,24 +273,39 @@ def residente_page(
 def guarda_page(
     request: Request,
     user: User = Depends(require_page("guarda")),
+    pagina_h: str = "1",
+    pagina_a: str = "1",
+    q_activas: str = "",
     db: Session = Depends(get_db),
 ):
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     start_utc, _ = day_window_utc(today_local)
-    visits = (
+    ingresos, h_ant, h_sig = paginar(
         db.query(Visit)
         .filter(Visit.entry_at.isnot(None), Visit.entry_at >= start_utc)
-        .order_by(Visit.entry_at.desc())
-        .limit(100)
-        .all()
+        .order_by(Visit.entry_at.desc()),
+        _pagina(pagina_h),
+        50,
     )
+
+    # Visitas activas: dentro del edificio y con QR aún vigente
+    activas_q = db.query(Visit).filter(Visit.status == "dentro", Visit.expires_at > utcnow())
+    q_a = q_activas.strip()
+    if q_a:
+        activas_q = activas_q.filter(Visit.visitor_name.ilike(f"%{q_a}%"))
+    activas, a_ant, a_sig = paginar(activas_q.order_by(Visit.entry_at.desc()), _pagina(pagina_a), 25)
+
     return templates.TemplateResponse(
         request,
         "guarda.html",
         {
             "user": user,
-            "visits": visits,
-            "names": name_map(db, visits),
+            "visits": ingresos,
+            "names": name_map(db, list(ingresos) + list(activas)),
+            "activas": activas,
+            "f_q_activas": q_activas,
+            "pager_h": pager(_pagina(pagina_h), h_ant, h_sig, "/guarda", {}, "pagina_h"),
+            "pager_a": pager(_pagina(pagina_a), a_ant, a_sig, "/guarda", {"q_activas": q_a}, "pagina_a"),
             "tabs": nav_de("guarda", "ingresos"),
         },
     )
@@ -294,6 +319,7 @@ def guarda_paquetes_page(
     request: Request,
     user: User = Depends(require_page("guarda")),
     pagina: str = "1",
+    pagina_e: str = "1",
     db: Session = Depends(get_db),
 ):
     pendientes, p_ant, p_sig = paginar(
@@ -305,12 +331,12 @@ def guarda_paquetes_page(
     )
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     start_utc, _ = day_window_utc(today_local)
-    entregados_hoy = (
+    entregados_hoy, e_ant, e_sig = paginar(
         db.query(Package)
         .filter(Package.delivered_at.isnot(None), Package.delivered_at >= start_utc)
-        .order_by(Package.delivered_at.desc())
-        .limit(50)
-        .all()
+        .order_by(Package.delivered_at.desc()),
+        _pagina(pagina_e),
+        50,
     )
     return templates.TemplateResponse(
         request,
@@ -320,6 +346,7 @@ def guarda_paquetes_page(
             "pendientes": paquetes_con_nombres(db, pendientes),
             "entregados_hoy": paquetes_con_nombres(db, entregados_hoy),
             "pager_p": pager(_pagina(pagina), p_ant, p_sig, "/guarda/paquetes", {}, "pagina"),
+            "pager_e": pager(_pagina(pagina_e), e_ant, e_sig, "/guarda/paquetes", {}, "pagina_e"),
             "tabs": nav_de("guarda", "paquetes"),
         },
     )

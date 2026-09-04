@@ -581,6 +581,27 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
     return d
 
 
+def auto_finalizar_visitas(db: Session) -> int:
+    """Salida automática: una visita 'dentro' cuyo QR ya expiró se cierra sola.
+
+    La hora de salida es la hora de expiración y queda la marca salida_auto
+    para distinguirla de una salida marcada por el guarda.
+    """
+    vencidas = (
+        db.query(Visit)
+        .filter(Visit.status == "dentro", Visit.expires_at < utcnow())
+        .all()
+    )
+    for v in vencidas:
+        v.status = "finalizada"
+        v.exit_at = v.expires_at
+        v.salida_auto = True
+    if vencidas:
+        db.commit()
+        log.info("salidas_automaticas=%s", len(vencidas))
+    return len(vencidas)
+
+
 def limpiar_fotos_vencidas(db: Session) -> int:
     """Borra las fotos cuyo plazo (30 días tras entrega) venció; el registro queda."""
     vencidos = (

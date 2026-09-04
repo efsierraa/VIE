@@ -6,7 +6,7 @@ from app.utils import utcnow
 ROLES = ("admin", "guarda", "residente")
 VISITOR_ROLES = ("visitante", "domiciliario")
 VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
-VALID_HOURS = (1, 2, 4, 8, 12, 24)
+VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
 
@@ -52,6 +52,7 @@ class Visit(Base):
     expires_at = Column(DateTime, nullable=False)
     entry_at = Column(DateTime)
     exit_at = Column(DateTime)
+    salida_auto = Column(Boolean, default=False, nullable=False)  # salida marcada al expirar el QR
     entry_guard_id = Column(Integer, ForeignKey("users.id"))
     exit_guard_id = Column(Integer, ForeignKey("users.id"))
 

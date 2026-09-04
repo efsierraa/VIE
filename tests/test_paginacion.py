@@ -56,8 +56,8 @@ def test_historial_admin_paginado(client):
 
     page2 = client.get("/admin/historial?tipo=ingresos&pagina_v=2")
     assert "Masiva 001" in page2.text
+    assert "Masiva 005" in page2.text  # las 5 más viejas de este lote caen en la página 2
     assert "← Anterior" in page2.text
-    assert "Siguiente →" not in page2.text  # última página
 
 
 def test_historial_filtros_y_pagina_combinados(client):

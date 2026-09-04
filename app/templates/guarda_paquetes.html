@@ -117,6 +117,13 @@
   <p class="hint">Sin paquetes entregados hoy.</p>
   {% endif %}
   </div>
+  {% if pager_e.anterior or pager_e.siguiente %}
+  <p class="paginador">
+    {% if pager_e.anterior %}<a class="small" href="{{ pager_e.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_e.pagina }}</span>
+    {% if pager_e.siguiente %}<a class="small" href="{{ pager_e.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 {% endblock %}
 

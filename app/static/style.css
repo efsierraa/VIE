@@ -163,6 +163,8 @@ button.small.danger:hover { background: none; color: #a91e1e; }
 .chip.status-entregado { background: var(--info-suave); color: #1565c0; }
 .chip.status-confirmado { background: var(--ok-suave); color: var(--ok); }
 .chip.status-disputa { background: #fce4ec; color: #ad1457; }
+.chip.extendida { background: #ede7f6; color: #4527a0; }
+td small.auto { color: var(--gris-texto); font-style: italic; }
 .chip.manual { background: var(--alerta-suave); color: #8d6e00; }
 
 /* Alertas */

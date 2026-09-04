@@ -23,6 +23,42 @@
   <div id="result-body"></div>
 </section>
 
+<h2>Visitas activas</h2>
+<section class="card">
+  <p class="hint">Dentro del edificio y con QR vigente. Útil para cotejar si un visitante está registrado y activo:</p>
+  <form method="get" action="/guarda" class="form inline">
+    <input name="q_activas" value="{{ f_q_activas }}" placeholder="Nombre del visitante" autocomplete="off">
+    <button type="submit">Buscar</button>
+  </form>
+  <div class="table-wrap">
+  {% if activas %}
+  <table>
+    <thead><tr><th>Visitante</th><th>Destino</th><th>Entrada</th><th>Vence</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for v in activas %}
+    <tr>
+      <td>{{ v.visitor_name }}</td>
+      <td>T{{ v.tower }} · {{ v.apartment }}</td>
+      <td>{{ v.entry_at|dt }}</td>
+      <td>{{ v.expires_at|dt }}{% if v|extendida %} <span class="chip extendida">extendida</span>{% endif %}</td>
+      <td><span class="chip status-dentro">activa</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin visitas activas.{% if f_q_activas %} Sin coincidencias para "{{ f_q_activas }}".{% endif %}</p>
+  {% endif %}
+  </div>
+  {% if pager_a.anterior or pager_a.siguiente %}
+  <p class="paginador">
+    {% if pager_a.anterior %}<a class="small" href="{{ pager_a.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_a.pagina }}</span>
+    {% if pager_a.siguiente %}<a class="small" href="{{ pager_a.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
+</section>
+
 <details class="card">
   <summary>Entrada manual (visitante sin QR)</summary>
   <form id="manual-form" class="form">
@@ -57,7 +93,7 @@
       <td>T{{ v.tower }} · {{ v.apartment }}</td>
       <td><span class="chip status-{{ v.status }}">{{ v.status }}</span></td>
       <td>{{ v.entry_at|dt }}</td>
-      <td>{{ v.exit_at|dt }}</td>
+      <td>{{ v.exit_at|dt }}{% if v.salida_auto %}<br><small class="auto">salida automática</small>{% endif %}</td>
       <td>{% if v.entry_at and v.exit_at %}{{ (v.exit_at - v.entry_at)|dur }}{% else %}—{% endif %}</td>
       <td>{{ names.get(v.entry_guard_id, "—") }}</td>
     </tr>
@@ -68,6 +104,13 @@
   <p class="hint">Sin ingresos registrados hoy.</p>
   {% endif %}
   </div>
+  {% if pager_h.anterior or pager_h.siguiente %}
+  <p class="paginador">
+    {% if pager_h.anterior %}<a class="small" href="{{ pager_h.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_h.pagina }}</span>
+    {% if pager_h.siguiente %}<a class="small" href="{{ pager_h.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
 </section>
 {% endblock %}
 

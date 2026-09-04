@@ -15,9 +15,10 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 - **Admin · Cuentas**: crear cuentas (una a una o importando un CSV), asignar claves, activar/desactivar
 - **Admin · Historial**: selector de tipo (Ingresos / Paquetes / Ambos) con filtros que se adaptan (fecha, estado, texto, torre), exportación a Excel por tipo y rango de fechas, y asignación de paquetes de no registrados — incluso después de entregados
 
-1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** para compartir por WhatsApp — imagen y texto — junto con un **código corto de 6 caracteres**.
-2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita.
-3. **Administración**: supervisa todo desde el historial con trazabilidad completa.
+1. **Residente**: crea una visita (nombre, asunto, ID opcional, rol) y recibe un **QR de un solo uso** para compartir por WhatsApp — imagen y texto — junto con un **código corto de 6 caracteres**. Vigencias de 1 a 24 horas y **visitas extendidas** de 2 a 30 días (familia de visita, remodelaciones).
+2. **Guarda**: escanea el QR en portería (o digita el código corto) → registra la **entrada**. Un segundo escaneo opcional marca la **salida** y calcula la duración de la visita. Si nadie marca la salida, la app la **marca automáticamente al vencer el QR** (queda con la nota "salida automática" en el registro).
+3. **Visitas activas**: el guarda puede consultar en cualquier momento qué visitas están **dentro del edificio y vigentes** — con buscador por nombre y paginación — para cotejar "¿está registrada y activa?" aunque no reconozca al visitante.
+4. **Administración**: supervisa todo desde el historial con trazabilidad completa.
 
 ### Paquetes
 

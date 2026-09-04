@@ -43,6 +43,10 @@ def _ensure_schema():
         with engine.begin() as conn:
             for col in faltan_destino:
                 conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} VARCHAR(10)")
+    if "salida_auto" not in {c["name"] for c in insp.get_columns("visits")}:
+        falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f"ALTER TABLE visits ADD COLUMN salida_auto BOOLEAN DEFAULT {falso} NOT NULL")
 
 
 @asynccontextmanager
@@ -50,6 +54,7 @@ async def lifespan(app: FastAPI):
     _ensure_schema()
     with SessionLocal() as db:
         api.limpiar_fotos_vencidas(db)
+        api.auto_finalizar_visitas(db)  # salida automática de visitas cuyo QR ya expiró
     yield
 
 
