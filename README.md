@@ -10,7 +10,7 @@ Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 La app se organiza en **páginas por sección** con una barra de navegación inferior en el celular:
 
 - **Guarda · Ingresos**: escáner de entrada/salida, entrada manual, ingresos del día, **visitas activas** (con buscador) y edición de sus ingresos manuales durante 1 hora (periodo de gracia)
-- **Guarda · Paquetes**: pendientes por entregar, registro (con o sin QR), entrega por código/cédula, entregados del día
+- **Guarda · Paquetes**: pendientes por entregar, registro (residentes y no registrados — todos con QR de reclamo), entrega por código/cédula, entregados del día
 - **Admin · Inicio**: métricas del día
 - **Admin · Cuentas**: crear cuentas (una a una o importando un CSV), asignar claves, activar/desactivar
 - **Admin · Historial**: selector de tipo (Ingresos / Paquetes / Ambos) con filtros que se adaptan (fecha, estado, texto, torre), exportación a Excel por tipo y rango de fechas, asignación de paquetes de no registrados — incluso después de entregados —, **edición a voluntad de los ingresos manuales** y **control de ediciones** (qué cambió, quién y cuándo)
@@ -34,10 +34,10 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 
 Cuando el paquete llega por transportadora para una persona sin cuenta (lo más probable: un residente nuevo), el guarda marca **"El destinatario NO está registrado"** al registrarlo:
 
-1. Digita el **nombre del destinatario** y su **torre y apartamento** (obligatorios — vienen en la etiqueta del paquete), y toma la **foto del paquete**. No se pide cédula al registrar — quien trajo el paquete es la transportadora
-2. El paquete **no tiene QR**: la llave es el nombre. En "Entregar paquete → No registrado" el guarda busca por nombre
-3. Al reclamar, la persona presenta su **cédula física**: el guarda coteja que el nombre coincida con el registrado, **digita el número de cédula** (queda como evidencia de quién reclamó) y marca la entrega
-4. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana un QR y el residente lo ve en su app
+1. Digita el **nombre del destinatario** (nombres y apellidos separados), su **celular (opcional)**, la **torre y el apartamento** (obligatorios — vienen en la etiqueta) y toma la **foto del paquete**. No se pide cédula al registrar — quien trajo el paquete es la transportadora
+2. El paquete **nace con un QR de reclamo y un código corto**: si digitaste el celular, envíale al destinatario **el QR más el texto por WhatsApp** (la imagen lleva el código impreso); también puedes reenviarlo con **"Ver QR"** en la lista de pendientes
+3. Al reclamar, la persona presenta **el QR y su cédula física**: el guarda escanea (o digita el código o busca por nombre), coteja que el nombre coincida con la cédula, **digita el número de cédula** (queda como evidencia de quién reclamó) y marca la entrega
+4. Administración recibe la **alerta** ("paquetes sin residente" en el dashboard): registra al residente nuevo en "Nueva cuenta" y pulsa **"Asignar a residente"** → el paquete gana dueño y el residente lo ve en su app
 5. Si nunca se asigna, el paquete se entrega con la cédula y queda en el historial
 6. La foto del paquete se borra sola 30 días después de la entrega; el número de cédula queda en el registro como evidencia
 

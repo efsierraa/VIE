@@ -21,7 +21,7 @@
     {% endfor %}
     </tbody>
   </table>
-  <p class="hint">Para entregar: escanea el QR del residente, digita el código o usa la búsqueda por nombre (no registrados).</p>
+  <p class="hint">Para entregar: escanea el QR de reclamo (de residente o no registrado), digita el código o usa la búsqueda por nombre.</p>
   {% else %}
   <p class="hint">No hay paquetes pendientes por entregar.</p>
   {% endif %}
@@ -40,7 +40,7 @@
   <form id="pkg-form" class="form">
     <label class="check">
       <input type="checkbox" id="pkg-es-tercero">
-      El destinatario NO está registrado (sin QR: se entrega con cédula)
+      El destinatario NO está registrado (se le envía un QR de reclamo por WhatsApp; la entrega se hace con cédula)
     </label>
     <div id="pkg-bloque-residente">
       <label>Residente
