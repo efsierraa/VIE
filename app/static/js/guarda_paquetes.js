@@ -105,8 +105,10 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
       pkgInput.value = "";
       pkgEsTercero.checked = false;
       pkgEsTercero.dispatchEvent(new Event("change"));
+      guiarA(okBox, true);
     } else {
       okBox.innerHTML = '<p class="alert error">' + esc(j.detail || "Error registrando el paquete") + '</p>';
+      guiarA(okBox, false);
     }
     return;
   }
@@ -126,8 +128,10 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
     pkgPreview.classList.add("hidden");
     pkgResidentId.value = "";
     pkgInput.value = "";
+    guiarA(okBox, true);
   } else {
     okBox.innerHTML = '<p class="alert error">' + esc(j.detail || "Error registrando el paquete") + '</p>';
+    guiarA(okBox, false);
   }
 });
 

@@ -7,6 +7,16 @@ function show(html) {
   if (!resultBody || !resultCard) return;
   resultBody.innerHTML = html;
   resultCard.classList.remove("hidden");
+  guiarA(resultCard, html.includes('class="alert ok"'));
+}
+
+// Guía al usuario hacia el resultado: scroll suave + destello + vibración en éxito
+function guiarA(card, exito) {
+  card.scrollIntoView({behavior: "smooth", block: "start"});
+  card.classList.remove("destello");
+  requestAnimationFrame(() => card.classList.add("destello"));
+  setTimeout(() => card.classList.remove("destello"), 1200);
+  if (exito && navigator.vibrate) navigator.vibrate(50);
 }
 
 async function submitScan(payload) {
@@ -38,6 +48,7 @@ async function enviarCamara(token) {
   if (j.tipo === "paquete") {
     renderPaquete(j, resultBody);
     resultCard.classList.remove("hidden");
+    guiarA(resultCard, true);
   } else {
     const v = j.visit;
     const quien = v.visitor_nombres

@@ -157,6 +157,13 @@ button.small.danger:hover { background: none; color: #a91e1e; }
 .chip.role-residente { background: var(--verde-suave); color: var(--verde-oscuro); }
 a.chip { text-decoration: none; cursor: pointer; }
 a.chip:hover { filter: brightness(0.95); }
+
+/* Destello: al guiar al resultado, la tarjeta se ilumina un momento */
+@keyframes destello {
+  0% { box-shadow: 0 0 0 3px var(--verde-suave); background: var(--verde-suave); }
+  100% { box-shadow: none; background: #fff; }
+}
+.destello { animation: destello 1.1s ease-out; }
 .chip.status-pendiente { background: var(--alerta-suave); color: #8d6e00; }
 .chip.status-dentro { background: var(--info-suave); color: #1565c0; }
 .chip.status-finalizada { background: #eceff1; color: #546e7a; }
