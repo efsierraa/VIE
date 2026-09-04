@@ -65,6 +65,6 @@ def test_mi_perfil_datos_solo_lectura(client):
     page = client.get("/cuenta").text
     assert "Mi perfil" in page
     assert "Mis datos" in page
-    assert "Destino:" in page  # en solo lectura, con el destino vigente sea cual sea
+    assert "Residencia:" in page  # para el residente su torre·apto es su residencia, no un destino
     assert "los actualiza administración" in page
     assert 'id="cel-form"' in page  # su celular sí se edita

@@ -5,8 +5,12 @@
 <section class="card narrow">
   <h2>Mis datos</h2>
   <p class="hint">Usuario: <strong>{{ user.username }}</strong> · Rol: <strong>{{ user.role }}</strong></p>
-  <p class="hint">Destino: <strong>{% if user.tower %}T{{ user.tower }} · {{ user.apartment }}{% else %}—{% endif %}</strong></p>
-  <p class="hint">Nombres, torre y apartamento los actualiza administración — pídeselo si cambió algo.</p>
+  {% if user.role == "residente" %}
+  <p class="hint">Residencia: <strong>T{{ user.tower }} · {{ user.apartment }}</strong></p>
+  <p class="hint">Nombres y tu residencia los actualiza administración — pídeselo si cambió algo.</p>
+  {% else %}
+  <p class="hint">Tus nombres los actualiza administración.</p>
+  {% endif %}
   <h2>Mi celular</h2>
   <form id="cel-form" class="form">
     <label>Celular (opcional) <input name="celular" inputmode="tel" value="{{ user.celular or '' }}" placeholder="Ej: 300 123 4567"></label>
