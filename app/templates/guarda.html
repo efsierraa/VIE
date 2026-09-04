@@ -62,7 +62,10 @@
 <details class="card">
   <summary>Entrada manual (visitante sin QR)</summary>
   <form id="manual-form" class="form">
-    <label>Nombre <input name="visitor_name" required></label>
+    <div class="row">
+      <label>Nombres <input name="visitor_nombres" required maxlength="80"></label>
+      <label>Apellidos <input name="visitor_apellidos" required maxlength="80"></label>
+    </div>
     <label>Asunto <input name="subject" required></label>
     <label>Identificación (opcional) <input name="id_number"></label>
     <label>Rol

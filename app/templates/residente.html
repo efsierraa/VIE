@@ -23,7 +23,10 @@
 <h1>Nueva visita</h1>
 <section class="card">
   <form id="visit-form" class="form">
-    <label>Nombre del visitante <input name="visitor_name" required placeholder="Ej: Juan Pérez"></label>
+    <div class="row">
+      <label>Nombres <input name="visitor_nombres" required maxlength="80" placeholder="Ej: Juan, María"></label>
+      <label>Apellidos <input name="visitor_apellidos" required maxlength="80" placeholder="Ej: Pérez Gómez"></label>
+    </div>
     <label>Asunto <input name="subject" required placeholder="Ej: visita familiar, entrega de domo"></label>
     <label>Identificación (opcional) <input name="id_number" placeholder="Cédula"></label>
     <label>Rol

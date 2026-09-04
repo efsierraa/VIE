@@ -80,14 +80,16 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
   e.preventDefault();
   const okBox = document.getElementById("pkg-registro-ok");
   if (pkgEsTercero.checked) {
-    const nombre = document.getElementById("pkg-tercero-nombre").value.trim();
+    const nombres = document.getElementById("pkg-tercero-nombres").value.trim();
+    const apellidos = document.getElementById("pkg-tercero-apellidos").value.trim();
     const torre = document.getElementById("pkg-tercero-torre").value.trim().toUpperCase();
     const apto = document.getElementById("pkg-tercero-apto").value.trim();
-    if (!nombre) { alert("Digita el nombre del destinatario (el de la etiqueta del paquete)"); return; }
+    if (!nombres || !apellidos) { alert("Digita nombres y apellidos del destinatario en campos separados (como en la etiqueta)"); return; }
     if (!torre || !apto) { alert("Torre y apartamento son obligatorios: vienen en la etiqueta del paquete"); return; }
     if (!pkgFotoB64) { alert("Toma la foto del paquete"); return; }
     const r = await fetch("/api/packages/manual", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-      nombre,
+      nombres,
+      apellidos,
       tower: torre, apartment: apto,
       description: document.getElementById("pkg-desc").value,
       photo_b64: pkgFotoB64,

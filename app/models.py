@@ -36,7 +36,9 @@ class Visit(Base):
     id = Column(Integer, primary_key=True)
     uuid = Column(String(36), unique=True, nullable=False, index=True)
     short_code = Column(String(8), unique=True, index=True)  # código corto para digitar en portería
-    visitor_name = Column(String(120), nullable=False)
+    visitor_name = Column(String(120), nullable=False)  # "Nombres Apellidos" para mostrar y buscar
+    visitor_nombres = Column(String(80))  # dos campos claros: nombres y apellidos por separado
+    visitor_apellidos = Column(String(80))
     subject = Column(String(200), nullable=False)
     id_number = Column(String(30))
     visitor_role = Column(String(20), nullable=False)  # visitante | domiciliario
@@ -78,7 +80,9 @@ class Package(Base):
     # (viene en la etiqueta). Al reclamar, se coteja el nombre con la cédula física
     # y se guarda el número de cédula de quien reclamó como evidencia.
     tercero = Column(Boolean, default=False, nullable=False)
-    nombre_tercero = Column(String(120))
+    nombre_tercero = Column(String(120))  # "Nombres Apellidos" del destinatario de la etiqueta
+    tercero_nombres = Column(String(80))
+    tercero_apellidos = Column(String(80))
     cedula_tercero = Column(String(30), index=True)  # cédula de quien reclamó, al entregar
 
     # Todo paquete nace con destino asociado: se copia del perfil del residente

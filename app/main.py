@@ -47,6 +47,16 @@ def _ensure_schema():
         falso = "FALSE" if engine.dialect.name == "postgresql" else "0"
         with engine.begin() as conn:
             conn.exec_driver_sql(f"ALTER TABLE visits ADD COLUMN salida_auto BOOLEAN DEFAULT {falso} NOT NULL")
+    vis_cols = {c["name"] for c in insp.get_columns("visits")}
+    for col in ("visitor_nombres", "visitor_apellidos"):
+        if col not in vis_cols:
+            with engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE visits ADD COLUMN {col} VARCHAR(80)")
+    pkg_cols = {c["name"] for c in insp.get_columns("packages")}
+    for col in ("tercero_nombres", "tercero_apellidos"):
+        if col not in pkg_cols:
+            with engine.begin() as conn:
+                conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} VARCHAR(80)")
 
 
 @asynccontextmanager

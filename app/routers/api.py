@@ -62,6 +62,8 @@ def visit_dict(v: Visit) -> dict:
         "uuid": v.uuid,
         "short_code": v.short_code,
         "visitor_name": v.visitor_name,
+        "visitor_nombres": v.visitor_nombres,
+        "visitor_apellidos": v.visitor_apellidos,
         "subject": v.subject,
         "id_number": v.id_number,
         "visitor_role": v.visitor_role,
@@ -76,8 +78,30 @@ def visit_dict(v: Visit) -> dict:
     }
 
 
+def resolver_nombre(nombres: str | None, apellidos: str | None, fallback: str | None = None) -> tuple[str, str | None, str | None]:
+    """Dos campos obligatorios y claros: nombres y apellidos por separado.
+
+    Devuelve (nombre completo, nombres, apellidos). El campo antiguo de nombre
+    completo se acepta solo para compatibilidad con clientes anteriores.
+    """
+    n = (nombres or "").strip()
+    a = (apellidos or "").strip()
+    if n or a:
+        if not n or not a:
+            raise HTTPException(400, "Nombres y apellidos son obligatorios en campos separados")
+        if len(n) > 80 or len(a) > 80:
+            raise HTTPException(400, "Nombres o apellidos demasiado largos (máximo 80)")
+        return f"{n} {a}", n, a
+    completo = (fallback or "").strip()
+    if not completo:
+        raise HTTPException(400, "Nombres y apellidos son obligatorios en campos separados")
+    return completo, None, None
+
+
 class VisitIn(BaseModel):
-    visitor_name: str
+    visitor_nombres: str | None = None
+    visitor_apellidos: str | None = None
+    visitor_name: str | None = None  # compatibilidad: clientes antiguos
     subject: str
     id_number: str | None = None
     visitor_role: str
@@ -91,7 +115,9 @@ class ScanIn(BaseModel):
 
 
 class ManualIn(BaseModel):
-    visitor_name: str
+    visitor_nombres: str | None = None
+    visitor_apellidos: str | None = None
+    visitor_name: str | None = None  # compatibilidad: clientes antiguos
     subject: str
     id_number: str | None = None
     visitor_role: str
@@ -173,7 +199,9 @@ def create_visit(
     user: User = Depends(require_api("residente")),
     db: Session = Depends(get_db),
 ):
-    visitor_name = data.visitor_name.strip()
+    visitor_name, v_nombres, v_apellidos = resolver_nombre(
+        data.visitor_nombres, data.visitor_apellidos, data.visitor_name
+    )
     subject = data.subject.strip()
     if not visitor_name or not subject:
         raise HTTPException(400, "Nombre y asunto son obligatorios")
@@ -188,6 +216,8 @@ def create_visit(
         uuid=str(uuid4()),
         short_code=new_short_code(db),
         visitor_name=visitor_name,
+        visitor_nombres=v_nombres,
+        visitor_apellidos=v_apellidos,
         subject=subject,
         id_number=(data.id_number or "").strip() or None,
         visitor_role=data.visitor_role,
@@ -358,7 +388,9 @@ def manual_entry(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
-    visitor_name = data.visitor_name.strip()
+    visitor_name, v_nombres, v_apellidos = resolver_nombre(
+        data.visitor_nombres, data.visitor_apellidos, data.visitor_name
+    )
     subject = data.subject.strip()
     tower = data.tower.strip().upper()
     apartment = data.apartment.strip()
@@ -371,6 +403,8 @@ def manual_entry(
         uuid=str(uuid4()),
         short_code=new_short_code(db),
         visitor_name=visitor_name,
+        visitor_nombres=v_nombres,
+        visitor_apellidos=v_apellidos,
         subject=subject,
         id_number=(data.id_number or "").strip() or None,
         visitor_role=data.visitor_role,
@@ -566,6 +600,8 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
         "status": p.status,
         "tercero": p.tercero,
         "nombre_tercero": p.nombre_tercero,
+        "tercero_nombres": p.tercero_nombres,
+        "tercero_apellidos": p.tercero_apellidos,
         "cedula_tercero": p.cedula_tercero,
         "tower": p.tower,
         "apartment": p.apartment,
@@ -771,7 +807,9 @@ def escanear_paquete(
 
 
 class PackageManualIn(BaseModel):
-    nombre: str
+    nombres: str | None = None
+    apellidos: str | None = None
+    nombre: str | None = None  # compatibilidad: clientes antiguos
     tower: str
     apartment: str
     description: str | None = None
@@ -784,12 +822,11 @@ def registrar_paquete_tercero(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
-    """Paquete para alguien sin cuenta: llega por transportadora. Se registra el nombre
-    del destinatario y su destino (torre y apartamento de la etiqueta — obligatorios).
-    Al reclamar se coteja el nombre con la cédula."""
-    nombre = data.nombre.strip()
-    if not nombre:
-        raise HTTPException(400, "El nombre del destinatario es obligatorio")
+    """Paquete para alguien sin cuenta: llega por transportadora. Se registran los nombres
+    y apellidos del destinatario (dos campos, como en la etiqueta) y su destino
+    (torre y apartamento de la etiqueta — obligatorios). Al reclamar se coteja el
+    nombre con la cédula."""
+    nombre, t_nombres, t_apellidos = resolver_nombre(data.nombres, data.apellidos, data.nombre)
     if len(nombre) > 120:
         raise HTTPException(400, "El nombre es demasiado largo")
     tower = data.tower.strip().upper()
@@ -814,6 +851,8 @@ def registrar_paquete_tercero(
         photo_mime=mime,
         tercero=True,
         nombre_tercero=nombre,
+        tercero_nombres=t_nombres,
+        tercero_apellidos=t_apellidos,
         tower=tower,
         apartment=apartment,
     )

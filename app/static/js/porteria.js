@@ -14,8 +14,11 @@ async function submitScan(payload) {
   const j = await r.json();
   if (r.ok && j.ok) {
     const v = j.visit;
+    const quien = v.visitor_nombres
+      ? '<strong>Nombres: ' + esc(v.visitor_nombres) + '</strong> · Apellidos: ' + esc(v.visitor_apellidos) + ' (' + esc(v.visitor_role) + ')'
+      : '<strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')';
     show('<p class="alert ok">' + esc(j.message) + '</p>' +
-      '<p><strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')<br>' +
+      '<p>' + quien + '<br>' +
       esc(v.subject) + '<br>Torre ' + esc(v.tower) + ' · Apto ' + esc(v.apartment) +
       (v.id_number ? '<br>ID: ' + esc(v.id_number) : '') + '</p>');
     setTimeout(() => location.reload(), 2500);
@@ -37,8 +40,11 @@ async function enviarCamara(token) {
     resultCard.classList.remove("hidden");
   } else {
     const v = j.visit;
+    const quien = v.visitor_nombres
+      ? '<strong>Nombres: ' + esc(v.visitor_nombres) + '</strong> · Apellidos: ' + esc(v.visitor_apellidos) + ' (' + esc(v.visitor_role) + ')'
+      : '<strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')';
     show('<p class="alert ok">' + esc(j.message) + '</p>' +
-      '<p><strong>' + esc(v.visitor_name) + '</strong> (' + esc(v.visitor_role) + ')<br>' +
+      '<p>' + quien + '<br>' +
       esc(v.subject) + '<br>Torre ' + esc(v.tower) + ' · Apto ' + esc(v.apartment) +
       (v.id_number ? '<br>ID: ' + esc(v.id_number) : '') + '</p>');
     setTimeout(() => location.reload(), 2500);
@@ -60,17 +66,21 @@ function renderPaquete(j, box) {
 }
 
 function renderTercero(p, box) {
+  const quien = p.tercero_nombres
+    ? '<strong>Nombres: ' + esc(p.tercero_nombres) + '</strong> · Apellidos: ' + esc(p.tercero_apellidos)
+    : '<strong>' + esc(p.nombre_tercero) + '</strong>';
+  const nombreCompleto = p.tercero_nombres ? p.tercero_nombres + " " + p.tercero_apellidos : p.nombre_tercero;
   box.innerHTML =
     '<img src="' + p.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
-    '<p><strong>' + esc(p.nombre_tercero) + '</strong>' +
+    '<p>' + quien +
     (p.description ? '<br>' + esc(p.description) : '') + '</p>' +
-    '<label>Cédula de quien reclama (se coteja el nombre con la cédula física)' +
+    '<label>Cédula de quien reclama (se cotejan nombres y apellidos con la cédula física)' +
     '<input id="tercero-cedula" maxlength="30" inputmode="numeric" autocomplete="off"></label>' +
     '<button id="btn-entregar" type="button">Marcar entregado</button>';
   document.getElementById("btn-entregar").addEventListener("click", async () => {
     const cedula = document.getElementById("tercero-cedula").value.trim();
     if (!cedula) { alert("Digita el número de cédula de quien reclama"); return; }
-    if (!confirm("¿Confirmas que entregaste el paquete a " + p.nombre_tercero + " (cédula " + cedula + ")?")) return;
+    if (!confirm("¿Confirmas que entregaste el paquete a " + nombreCompleto + " (cédula " + cedula + ")?")) return;
     const r2 = await fetch("/api/packages/" + p.uuid + "/entregar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({cedula})});
     const j2 = await r2.json();
     if (r2.ok && j2.ok) {
