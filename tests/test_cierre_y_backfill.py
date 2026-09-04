@@ -121,9 +121,14 @@ def test_leyenda_omite_codigo_cuando_no_existe(client):
     token = sign_package("sin-codigo-test")
     base64_a_png = lambda uri: Image.open(io.BytesIO(base64.b64decode(uri.split(",")[1])))
 
-    una_linea = base64_a_png(qr_pase_data_uri(token, ["Paquete de: Alguien"]))
-    dos_lineas = base64_a_png(qr_pase_data_uri(token, ["Código: ABC123", "Paquete de: Alguien"]))
-    assert dos_lineas.height - una_linea.height == 28  # cada línea de leyenda añade 28 px
+    una_linea = base64_a_png(qr_pase_data_uri(token, ["T4 · 1004"]))
+    dos_lineas = base64_a_png(qr_pase_data_uri(token, ["Código: ABC123", "T4 · 1004"]))
+    assert dos_lineas.height - una_linea.height == 34  # cada línea de leyenda añade 34 px
+
+    # un texto largo ensancha el lienzo y el QR queda centrado (sin recortes)
+    ancho_corto = base64_a_png(qr_pase_data_uri(token, ["Código: ABC123"])).width
+    ancho_largo = base64_a_png(qr_pase_data_uri(token, ["Código: ABC123", "XXXXXXXXXXXXXXXXXXXXXXXXXXXX"])).width
+    assert ancho_largo > ancho_corto
 
     # el pase de un paquete legacy sin código responde sin crash
     import uuid as uuid_mod

@@ -61,23 +61,36 @@ def qr_data_uri(text: str) -> str:
 
 
 def qr_pase_data_uri(token: str, lineas: list[str]) -> str:
-    """QR del pase con leyenda incrustada debajo: la imagen sola identifica el pase
-    (código corto y de quién es) — imprescindible al compartir por WhatsApp."""
+    """QR del pase con leyenda incrustada debajo: la imagen sola identifica el pase.
+
+    La leyenda usa textos cortos y fijos (código y torre·apto — nunca nombres,
+    que son de largo variable). El lienzo se ensancha si el texto lo pide y
+    centra el QR."""
     qr = qrcode.make(token, box_size=6, border=2).convert("RGB")
-    ancho = qr.width
-    alto_leyenda = 28 * len(lineas) + 14
+    fuente = None
+    for nombre in ("DejaVuSans-Bold.ttf", "arialbd.ttf", "Arial Bold.ttf", "arial.ttf"):
+        try:
+            fuente = ImageFont.truetype(nombre, 19)
+            break
+        except OSError:
+            continue
+    if fuente is None:
+        fuente = ImageFont.load_default(size=19)  # Pillow moderno: fuente escalable
+    medida = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    anchos = []
+    for linea in lineas:
+        caja = medida.textbbox((0, 0), linea, font=fuente)
+        anchos.append(caja[2] - caja[0] + 16)
+    ancho = max([qr.width] + anchos)
+    alto_leyenda = 34 * len(lineas) + 16
     lienzo = Image.new("RGB", (ancho, qr.height + alto_leyenda), "white")
-    lienzo.paste(qr, (0, 0))
+    lienzo.paste(qr, ((ancho - qr.width) // 2, 0))
     dibujo = ImageDraw.Draw(lienzo)
-    try:
-        fuente = ImageFont.truetype("DejaVuSans-Bold.ttf", 19)
-    except OSError:
-        fuente = ImageFont.load_default()
-    y = qr.height + 8
+    y = qr.height + 12
     for linea in lineas:
         caja = dibujo.textbbox((0, 0), linea, font=fuente)
         dibujo.text(((ancho - (caja[2] - caja[0])) // 2, y), linea, fill="black", font=fuente)
-        y += 28
+        y += 34
     buf = io.BytesIO()
     lienzo.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -287,7 +300,7 @@ def create_visit(
     return {
         "ok": True,
         "token": token,
-        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}"]),
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"T{visit.tower} · {visit.apartment}"]),
         "visit": visit_dict(visit),
     }
 
@@ -342,7 +355,7 @@ def visit_pass(
     return {
         "ok": True,
         "token": token,
-        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}"]),
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"T{visit.tower} · {visit.apartment}"]),
         "visit": visit_dict(visit),
     }
 
@@ -498,7 +511,7 @@ def manual_entry(
         "ok": True,
         "message": "Entrada manual registrada",
         "token": token,
-        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"Visitante: {visit.visitor_name}", "Vigente 1 hora"]),
+        "qr_data_uri": qr_pase_data_uri(token, [f"Código: {visit.short_code}", f"T{visit.tower} · {visit.apartment}", "Vigente 1 hora"]),
         "visit": visit_dict(visit),
     }
 
@@ -1203,7 +1216,7 @@ def registrar_paquete_tercero(
     token = sign_package(pkg.uuid)
     qr = qr_pase_data_uri(
         token,
-        [f"Código: {pkg.short_code}", f"Paquete de: {nombre}", f"T{tower} · {apartment}"],
+        [f"Código: {pkg.short_code}", f"T{tower} · {apartment}"],
     )
     return {"ok": True, "token": token, "qr_data_uri": qr, "package": package_dict(pkg)}
 
@@ -1338,7 +1351,8 @@ def mis_paquetes(user: User = Depends(require_api("residente")), db: Session = D
             if p.photo:
                 d["photo_data_uri"] = f"data:{p.photo_mime};base64," + base64.b64encode(p.photo).decode()
             lineas = [f"Código: {p.short_code}"] if p.short_code else []
-            lineas.append(f"Paquete de: {user.nombre_completo}")
+            if user.tower and user.apartment:
+                lineas.append(f"T{user.tower} · {user.apartment}")
             d["qr_data_uri"] = qr_pase_data_uri(sign_package(p.uuid), lineas)
         out.append(d)
     pendientes = sum(1 for p in pkgs if p.status == "en_porteria")
@@ -1364,11 +1378,8 @@ def paquete_pass(
     lineas = []
     if pkg.short_code:
         lineas.append(f"Código: {pkg.short_code}")
-    if pkg.tercero:
-        lineas += [f"Paquete de: {pkg.nombre_tercero}", f"T{pkg.tower} · {pkg.apartment}"]
-    else:
-        residente = db.get(User, pkg.resident_id)
-        lineas.append(f"Paquete de: {residente.nombre_completo if residente else '—'}")
+    if pkg.tower and pkg.apartment:
+        lineas.append(f"T{pkg.tower} · {pkg.apartment}")
     return {
         "ok": True,
         "token": token,
