@@ -204,10 +204,6 @@ button.small.danger:hover { background: none; color: #a91e1e; }
 .chip.role-admin { background: #ede7f6; color: #4527a0; }
 .chip.role-guarda { background: #e0f7fa; color: #00695c; }
 .chip.role-residente { background: var(--verde-suave); color: var(--verde-oscuro); }
-.chip.role-piscina { background: #bbdefb; color: #0d47a0; }
-.chip.tipo-adulto { background: var(--verde-suave); color: var(--verde-oscuro); }
-.chip.tipo-nino { background: var(--alerta-suave); color: #8d6e00; }
-.chip.tipo-invitado { background: #ede7f6; color: #4527a0; }
 a.chip { text-decoration: none; cursor: pointer; }
 a.chip:hover { filter: brightness(0.95); }
 

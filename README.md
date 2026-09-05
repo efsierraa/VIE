@@ -22,8 +22,6 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 
 **Celular opcional en todo**: perfiles, visitas y paquetes de terceros. Se muestra en las tablas e historiales (y en el Excel) y activa el botón **Enviar por WhatsApp** con el pase precargado — sin celular, el botón no aparece.
 
-**Piscina**: rol de guarda de piscina con entradas y salidas (adultos residentes, niños siempre con su acompañante — ni entran ni salen solos — e invitados ligados a un residente padrino), lista de "en la piscina" con buscador, y supervisión completa en el Historial de administración.
-
 ### Paquetes
 
 1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente. Para encontrarlo busca por nombre o apellido; si va por destino, **torre y apartamento juntos**: `T4 1005`, `4 1005`, `4-1005` o `T4.1005` — torre sola o apto solo no arroja resultados (serían demasiados).

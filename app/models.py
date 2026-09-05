@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 from app.utils import utcnow
 
-ROLES = ("admin", "guarda", "residente", "piscina")
+ROLES = ("admin", "guarda", "residente")
 VISITOR_ROLES = ("visitante", "domiciliario")
 VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
@@ -106,37 +106,6 @@ class Package(Base):
     resuelta_porteria = Column(Boolean, default=False, nullable=False)
     resuelta_residente = Column(Boolean, default=False, nullable=False)
     resuelta_at = Column(DateTime)
-
-    # Resolución de disputa a dos partes: portería (guarda o admin) y residente.
-    # El paquete pasa a confirmado solo cuando ambas aceptan.
-    resuelta_porteria = Column(Boolean, default=False, nullable=False)
-    resuelta_residente = Column(Boolean, default=False, nullable=False)
-    resuelta_at = Column(DateTime)
-
-
-class PoolAccess(Base):
-    """Registro de piscina: una fila por persona (adulto, niño o invitado).
-
-    El niño siempre entra y sale con su acompañante (vínculo fila-a-fila:
-    acompanante_acceso_id apunta a la entrada del adulto, sea residente o
-    invitado). El invitado queda ligado a un residente padrino (residente_id).
-    """
-
-    __tablename__ = "pool_access"
-
-    id = Column(Integer, primary_key=True)
-    persona_tipo = Column(String(10), nullable=False)  # adulto | nino | invitado
-    resident_id = Column(Integer, ForeignKey("users.id"))  # adulto: él; niño: acompañante; invitado: padrino
-    acompanante_acceso_id = Column(Integer, ForeignKey("pool_access.id"))
-    menor_nombre = Column(String(80))
-    menor_edad = Column(Integer)
-    invitado_nombre = Column(String(80))
-    tower = Column(String(10))  # foto del destino al entrar
-    apartment = Column(String(10))
-    entry_at = Column(DateTime, default=utcnow, nullable=False)
-    exit_at = Column(DateTime)
-    entry_guard_id = Column(Integer, ForeignKey("users.id"))
-    exit_guard_id = Column(Integer, ForeignKey("users.id"))
 
 
 class EditLog(Base):
