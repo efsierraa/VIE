@@ -66,6 +66,7 @@
         <button class="small" data-reset="{{ u.id }}" data-nombre="{{ u.nombre_completo }}">Clave</button>
         <button class="small" data-2fa-reset="{{ u.id }}" data-nombre="{{ u.nombre_completo }}">2FA</button>
         <button class="small" data-toggle="{{ u.id }}">{{ "Desactivar" if u.active else "Activar" }}</button>
+        <button class="small danger" data-eliminar="{{ u.id }}" data-usuario="{{ u.username }}">Eliminar</button>
         {% endif %}
       </td>
     </tr>
@@ -83,7 +84,7 @@
     {% if pager_u.siguiente %}<a class="small" href="{{ pager_u.url_siguiente }}">Siguiente →</a>{% endif %}
   </p>
   {% endif %}
-  <p class="hint">"Editar" corrige nombres, celular y destino. "Clave" asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar). "2FA" reinicia el segundo factor (pérdida de teléfono; queda en el control de ediciones). El usuario y el rol no se editan.</p>
+  <p class="hint">"Editar" corrige nombres, celular y destino. "Clave" asigna una clave nueva (las claves guardadas no se pueden ver, solo reemplazar). "2FA" reinicia el segundo factor (pérdida de teléfono; queda en el control de ediciones). El usuario y el rol no se editan. "Eliminar" borra la cuenta solo si no tiene historial (visitas, paquetes o ediciones); si lo tiene, desactívala.</p>
 </section>
 
 <section id="edit-cuenta-card" class="card hidden">

@@ -1653,3 +1653,52 @@ def toggle_user(
     db.commit()
     log.info("cuenta_%s username=%s por=%s", "activada" if user.active else "desactivada", user.username, admin.username)
     return {"ok": True, "active": user.active}
+
+
+@router.delete("/users/{user_id}")
+def eliminar_usuario(
+    user_id: int,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Borra una cuenta solo si no tiene historial: visitas, paquetes y control
+    de ediciones la referencian por FK y preservarlos exige no borrarla. Con
+    historial, la alternativa es desactivarla."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "Usuario no encontrado")
+    if user.id == admin.id:
+        raise HTTPException(400, "No puedes borrar tu propia cuenta")
+    visitas = (
+        db.query(Visit)
+        .filter(
+            or_(
+                Visit.resident_id == user.id,
+                Visit.entry_guard_id == user.id,
+                Visit.exit_guard_id == user.id,
+            )
+        )
+        .count()
+    )
+    paquetes = (
+        db.query(Package)
+        .filter(or_(Package.resident_id == user.id, Package.delivered_by == user.id))
+        .count()
+    )
+    ediciones = db.query(EditLog).filter(EditLog.editor_id == user.id).count()
+    if visitas or paquetes or ediciones:
+        partes = []
+        if visitas:
+            partes.append(f"{visitas} visitas")
+        if paquetes:
+            partes.append(f"{paquetes} paquetes")
+        if ediciones:
+            partes.append(f"{ediciones} ediciones")
+        raise HTTPException(
+            400, "Tiene historial (" + ", ".join(partes) + "); desactívala en lugar de borrarla"
+        )
+    username = user.username
+    db.delete(user)
+    db.commit()
+    log.info("cuenta_eliminada username=%s por=%s", username, admin.username)
+    return {"ok": True}
