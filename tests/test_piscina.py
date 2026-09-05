@@ -202,3 +202,20 @@ def test_paginacion_activos_piscina(client):
 
     page2 = client.get("/piscina?pagina_a=2")
     assert "← Anterior" in page2.text
+
+
+def test_cuentas_ofrece_rol_piscina(client):
+    """El rol piscina se puede crear desde Admin · Cuentas (formulario y CSV)."""
+    login(client, "admin1")
+    page = client.get("/admin/cuentas").text
+    assert '<option value="piscina">Guarda de piscina</option>' in page
+    assert "residente, guarda, piscina o admin" in page
+
+    r = client.post(
+        "/api/users",
+        json={"nombres": "Pool", "apellidos": "Dos", "username": "piscina2", "password": "clave123", "role": "piscina"},
+    )
+    assert r.status_code == 200
+    login(client, "piscina2")
+    page = client.get("/piscina")
+    assert page.status_code == 200

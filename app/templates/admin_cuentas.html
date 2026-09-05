@@ -18,6 +18,7 @@
       <select name="role" id="role-select">
         <option value="residente">Residente</option>
         <option value="guarda">Guarda</option>
+        <option value="piscina">Guarda de piscina</option>
         <option value="admin">Administración</option>
       </select>
     </label>
@@ -32,7 +33,7 @@
 
 <details class="card">
   <summary>Importar usuarios desde CSV</summary>
-  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code> (puedes añadir una octava columna <code>celular</code>, opcional). Roles: residente, guarda o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
+  <p class="hint">Primera fila del archivo: <code>nombres,apellidos,usuario,clave,rol,torre,apartamento</code> (puedes añadir una octava columna <code>celular</code>, opcional). Roles: residente, guarda, piscina o admin. Un residente requiere torre y apartamento. Desde Excel: "Guardar como → CSV UTF-8 (delimitado por comas)". <a href="/static/ejemplo_usuarios.csv" download>Descargar ejemplo</a>.</p>
   <form id="csv-form" class="form inline">
     <input type="file" id="csv-file" accept=".csv,text/csv" required>
     <button type="submit">Importar</button>
