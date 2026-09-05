@@ -1,13 +1,13 @@
 # VIE — Vigilancia de Ingresos y Egresos
 
 > **El control de acceso de tu edificio, en un escaneo.**
-> App gratuita y open source para que el residente genere un pase QR de un solo uso, lo comparta por cualquier canal y el guarda valide el ingreso en segundos.
+> App gratuita y open source. Nació como control de **ingresos y egresos de personas**: el residente genera un pase QR de un solo uso, lo comparte por cualquier canal y el guarda valida el ingreso en segundos. Hoy también administra **paquetes** — y ese es, probablemente, su feature de mayor utilidad: cada paquete llega con foto, QR de reclamo y confirmación del residente. Se acabó el cuaderno de portería.
 
 Ver [pitch.md](pitch.md) para la idea completa, objetivos e impacto.
 
 ## Cómo funciona
 
-La app se organiza en **páginas por sección** con una barra de navegación inferior en el celular:
+La app cubre dos flujos — **personas** (visitas QR y piscina) y **paquetes** (recepción, reclamo y entrega) — y se organiza en **páginas por sección** con una barra de navegación inferior en el celular:
 
 - **Guarda · Ingresos**: escáner de entrada/salida, entrada manual, ingresos del día, **visitas activas** (con buscador) y edición de sus ingresos manuales durante 1 hora (periodo de gracia)
 - **Guarda · Paquetes**: pendientes por entregar, registro (residentes y no registrados — todos con QR de reclamo), entrega por código/cédula, entregados del día
@@ -25,6 +25,8 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 **Piscina**: rol de guarda de piscina con entradas y salidas (adultos residentes, niños siempre con su acompañante — ni entran ni salen solos — e invitados ligados a un residente padrino), lista de "en la piscina" con buscador, y supervisión completa en el Historial de administración.
 
 ### Paquetes
+
+Probablemente la función de mayor utilidad de VIE en el día a día: recepción con foto, aviso al residente con QR de reclamo, entrega verificada y confirmación. Sin cuadernos ni llamadas.
 
 1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente. Para encontrarlo busca por nombre o apellido; si va por destino, **torre y apartamento juntos**: `T4 1005`, `4 1005`, `4-1005` o `T4.1005` — torre sola o apto solo no arroja resultados (serían demasiados).
 2. El residente ve el aviso en su app: foto, descripción, código corto y **QR para reclamarlo**.
