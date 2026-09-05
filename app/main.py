@@ -38,6 +38,19 @@ _vie_log.handlers = [_handler]
 _vie_log.setLevel(logging.INFO)
 _vie_log.propagate = False
 
+def _relajar_full_name_legado(eng) -> bool:
+    """full_name es legado: en la BD vieja (Postgres) quedó NOT NULL y provoca
+    NotNullViolation en todo INSERT de usuario nuevo (SQLite no la exige)."""
+    if eng.dialect.name != "postgresql":
+        return False
+    col = next((c for c in inspect(eng).get_columns("users") if c["name"] == "full_name"), None)
+    if col is None or col["nullable"]:
+        return False
+    with eng.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE users ALTER COLUMN full_name DROP NOT NULL")
+    return True
+
+
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
     Base.metadata.create_all(engine)
@@ -55,6 +68,7 @@ def _ensure_schema():
                 u.nombres = partes[0] or u.username
                 u.apellidos = partes[1] if len(partes) > 1 else "-"
             db.commit()
+    _relajar_full_name_legado(engine)
     pkg_cols = {c["name"] for c in insp.get_columns("packages")}
     if "tercero" not in pkg_cols:
         # Postgres exige FALSE en un BOOLEAN; SQLite acepta 0
