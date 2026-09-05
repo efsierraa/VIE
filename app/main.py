@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import traceback
 import uuid
 from contextlib import asynccontextmanager
 
@@ -193,3 +194,18 @@ def forbidden_handler(request: Request, exc: web.PageForbidden):
         ),
         status_code=403,
     )
+
+
+@app.exception_handler(Exception)
+async def error_interno(request: Request, exc: Exception):
+    """Última red: un error no manejado queda en el log con traceback y contexto,
+    y el cliente recibe JSON (nunca HTML) para que el JS no rompa parseando."""
+    rid = request.headers.get("X-Request-Id", "?")
+    _vie_log.error(
+        "error_interno rid=%s metodo=%s ruta=%s traza=%s",
+        rid,
+        request.method,
+        request.url.path,
+        traceback.format_exc(limit=8),
+    )
+    return JSONResponse({"detail": "Error interno del servidor"}, status_code=500)
