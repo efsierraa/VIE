@@ -232,6 +232,10 @@ def _crear_usuario(
         raise ValueError("La clave debe tener al menos 8 caracteres")
     if not nombres or not apellidos:
         raise ValueError("Nombres y apellidos son obligatorios")
+    if len(username) > 50 or len(nombres) > 120 or len(apellidos) > 120:
+        raise ValueError("Usuario o nombres demasiado largos")
+    if len(tower or "") > 10 or len(apartment or "") > 10:
+        raise ValueError("Torre o apartamento demasiado largos")
     if role not in ROLES:
         raise ValueError("Rol no válido")
     if role == "residente" and not (tower and apartment):
@@ -592,6 +596,8 @@ def editar_cuenta(
         raise HTTPException(400, "Nombres o apellidos demasiado largos")
     tower = (data.tower or "").strip().upper() or None
     apartment = (data.apartment or "").strip() or None
+    if len(tower or "") > 10 or len(apartment or "") > 10:
+        raise HTTPException(400, "Torre o apartamento demasiado largos")
     if user.role == "residente" and not (tower and apartment):
         raise HTTPException(400, "Un residente requiere torre y apartamento")
     celular = normalizar_celular(data.celular)
