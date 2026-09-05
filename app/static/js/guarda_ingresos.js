@@ -30,10 +30,20 @@ document.getElementById("btn-cam").addEventListener("click", async () => {
       setTimeout(() => scanner.resume(), 2500);
     });
     document.getElementById("btn-cam").disabled = true;
+    document.getElementById("btn-detener-camara").classList.remove("hidden");
   } catch (err) {
     show('<p class="alert error">No se pudo iniciar la cámara. Usa el código pegado o la entrada manual.</p>');
     scanner = null;
   }
+});
+
+// Detener la cámara con la ✕ de la esquina
+document.getElementById("btn-detener-camara").addEventListener("click", async () => {
+  if (!scanner) return;
+  try { await scanner.stop(); scanner.clear(); } catch (err) {}
+  scanner = null;
+  document.getElementById("btn-detener-camara").classList.add("hidden");
+  document.getElementById("btn-cam").disabled = false;
 });
 
 document.getElementById("manual-form").addEventListener("submit", async e => {

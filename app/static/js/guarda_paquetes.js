@@ -182,10 +182,20 @@ document.getElementById("btn-cam-pkg").addEventListener("click", async () => {
       setTimeout(() => escanerPkg.resume(), 2500);
     });
     document.getElementById("btn-cam-pkg").disabled = true;
+    document.getElementById("btn-detener-camara-pkg").classList.remove("hidden");
   } catch (err) {
     box.innerHTML = '<p class="alert error">No se pudo iniciar la cámara. Digita el código del paquete.</p>';
     escanerPkg = null;
   }
+});
+
+// Detener la cámara con la ✕ de la esquina
+document.getElementById("btn-detener-camara-pkg").addEventListener("click", async () => {
+  if (!escanerPkg) return;
+  try { await escanerPkg.stop(); escanerPkg.clear(); } catch (err) {}
+  escanerPkg = null;
+  document.getElementById("btn-detener-camara-pkg").classList.add("hidden");
+  document.getElementById("btn-cam-pkg").disabled = false;
 });
 
 document.getElementById("tercero-form").addEventListener("submit", async e => {
