@@ -1,13 +1,18 @@
 """Robustez ante errores 500: validaciones de longitud (Postgres las exige,
-SQLite no — sin ellas el error era un 500 ciego) y handler global que devuelve
-JSON con traza en el log en vez de HTML que rompe el .json() del cliente."""
+SQLite no — sin ellas el error era un 500 ciego), handler global que devuelve
+JSON con traza en el log en vez de HTML que rompe el .json() del cliente, y
+migración que relaja la columna legado full_name (NOT NULL en la BD vieja)."""
 import asyncio
 import json
+from unittest.mock import MagicMock
 
 from conftest import login
 from fastapi import Request
 
+import app.main as main
+from app.database import SessionLocal
 from app.main import error_interno
+from app.models import User
 
 
 def test_crear_cuenta_con_campos_largos_da_400_no_500(client):
@@ -49,3 +54,51 @@ def test_handler_global_devuelve_json_500():
     assert respuesta.status_code == 500
     assert respuesta.headers["content-type"] == "application/json"
     assert json.loads(respuesta.body) == {"detail": "Error interno del servidor"}
+
+
+def test_crear_cuenta_sin_columna_legado_full_name(client):
+    """Crear cuenta no debe depender de full_name (legado): en producción
+    Postgres quedó NOT NULL y cada 'Crear cuenta' terminaba en 500."""
+    login(client, "admin1")
+    r = client.post(
+        "/api/users",
+        json={
+            "nombres": "Elena",
+            "apellidos": "Oyola",
+            "username": "eoyola",
+            "password": "clave12345",
+            "role": "guarda",
+            "celular": "573203912140",
+        },
+    )
+    assert r.status_code == 200, r.text
+    with SessionLocal() as db:
+        u = db.query(User).filter(User.username == "eoyola").first()
+        assert u is not None
+        assert u.nombres == "Elena"
+        assert u.apellidos == "Oyola"
+        assert u.full_name is None
+
+
+def _engine_falso(dialecto: str, nullable: bool) -> MagicMock:
+    eng = MagicMock()
+    eng.dialect.name = dialecto
+    inspector = MagicMock()
+    inspector.get_columns.return_value = [{"name": "full_name", "nullable": nullable}]
+    return eng, inspector
+
+
+def test_migracion_relaja_full_name_not_null(monkeypatch):
+    eng, inspector = _engine_falso("postgresql", nullable=False)
+    monkeypatch.setattr(main, "inspect", lambda _: inspector)
+    assert main._relajar_full_name_legado(eng) is True
+    conn = eng.begin.return_value.__enter__.return_value
+    assert "ALTER TABLE users ALTER COLUMN full_name DROP NOT NULL" in conn.exec_driver_sql.call_args[0][0]
+
+
+def test_migracion_full_name_intacta_si_ya_es_nullable(monkeypatch):
+    for dialecto, nullable in (("postgresql", True), ("sqlite", False), ("sqlite", True)):
+        eng, inspector = _engine_falso(dialecto, nullable)
+        monkeypatch.setattr(main, "inspect", lambda _: inspector)
+        assert main._relajar_full_name_legado(eng) is False
+        eng.begin.assert_not_called()
