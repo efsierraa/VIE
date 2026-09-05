@@ -8,6 +8,7 @@
     <a class="small {{ 'activa' if tipo == 'ingresos' else '' }}" href="/admin/historial?tipo=ingresos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Ingresos</a>
     <a class="small {{ 'activa' if tipo == 'paquetes' else '' }}" href="/admin/historial?tipo=paquetes&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Paquetes</a>
     <a class="small {{ 'activa' if tipo == 'ambos' else '' }}" href="/admin/historial?tipo=ambos&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Ambos</a>
+    <a class="small {{ 'activa' if tipo == 'piscina' else '' }}" href="/admin/historial?tipo=piscina&fecha={{ f_fecha }}&estado={{ f_estado }}&q={{ f_q }}&torre={{ f_torre }}&apto={{ f_apto }}">Piscina</a>
   </div>
 
   <form method="get" action="/admin/historial" class="form filters">
@@ -47,8 +48,9 @@
 
   <form method="get" action="/admin/exportar" class="form filters">
     <input type="hidden" name="tipo" value="{{ tipo }}">
-    <label class="check"><input type="checkbox" name="ingresos" value="1" {% if tipo != "paquetes" %}checked{% endif %}> Ingresos</label>
-    <label class="check"><input type="checkbox" name="paquetes" value="1" {% if tipo != "ingresos" %}checked{% endif %}> Paquetes</label>
+    <label class="check"><input type="checkbox" name="ingresos" value="1" {% if tipo != "paquetes" and tipo != "piscina" %}checked{% endif %}> Ingresos</label>
+    <label class="check"><input type="checkbox" name="paquetes" value="1" {% if tipo != "ingresos" and tipo != "piscina" %}checked{% endif %}> Paquetes</label>
+    <label class="check"><input type="checkbox" name="piscina" value="1" {% if tipo == "piscina" %}checked{% endif %}> Piscina</label>
     <label>Desde <input type="date" name="desde"></label>
     <label>Hasta <input type="date" name="hasta"></label>
     <button type="submit">Exportar Excel</button>
@@ -125,6 +127,42 @@
     {% if pager_paquetes.anterior %}<a class="small" href="{{ pager_paquetes.url_anterior }}">← Anterior</a>{% endif %}
     <span>Página {{ pager_paquetes.pagina }}</span>
     {% if pager_paquetes.siguiente %}<a class="small" href="{{ pager_paquetes.url_siguiente }}">Siguiente →</a>{% endif %}
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if ver_piscina %}
+<h2>Piscina</h2>
+<section class="card">
+  <div class="table-wrap">
+  {% if filas_piscina %}
+  <table>
+    <thead><tr><th>Persona</th><th>Tipo</th><th>Vínculo</th><th>Destino</th><th>Entrada</th><th>Salida</th><th>Duración</th></tr></thead>
+    <tbody>
+    {% for f in filas_piscina %}
+    {% set e = etiquetas_piscina[f.id] %}
+    <tr>
+      <td><strong>{{ e.persona }}</strong></td>
+      <td><span class="chip tipo-{{ f.persona_tipo }}">{{ f.persona_tipo }}</span></td>
+      <td>{{ e.vinculo or "—" }}</td>
+      <td>{{ e.destino }}</td>
+      <td>{{ f.entry_at|dt }}</td>
+      <td>{{ f.exit_at|dt }}</td>
+      <td>{% if f.entry_at and f.exit_at %}{{ (f.exit_at - f.entry_at)|dur }}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">Sin registros de piscina que coincidan con el filtro.</p>
+  {% endif %}
+  </div>
+  {% if pager_piscina.anterior or pager_piscina.siguiente %}
+  <p class="paginador">
+    {% if pager_piscina.anterior %}<a class="small" href="{{ pager_piscina.url_anterior }}">← Anterior</a>{% endif %}
+    <span>Página {{ pager_piscina.pagina }}</span>
+    {% if pager_piscina.siguiente %}<a class="small" href="{{ pager_piscina.url_siguiente }}">Siguiente →</a>{% endif %}
   </p>
   {% endif %}
 </section>
