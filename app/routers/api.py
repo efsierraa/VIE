@@ -233,6 +233,10 @@ def _crear_usuario(
         raise ValueError("La clave debe tener al menos 8 caracteres")
     if not nombres or not apellidos:
         raise ValueError("Nombres y apellidos son obligatorios")
+    if len(username) > 50 or len(nombres) > 120 or len(apellidos) > 120:
+        raise ValueError("Usuario o nombres demasiado largos")
+    if len(tower or "") > 10 or len(apartment or "") > 10:
+        raise ValueError("Torre o apartamento demasiado largos")
     if role not in ROLES:
         raise ValueError("Rol no válido")
     if role == "residente" and not (tower and apartment):
@@ -812,6 +816,8 @@ def editar_cuenta(
         raise HTTPException(400, "Nombres o apellidos demasiado largos")
     tower = (data.tower or "").strip().upper() or None
     apartment = (data.apartment or "").strip() or None
+    if len(tower or "") > 10 or len(apartment or "") > 10:
+        raise HTTPException(400, "Torre o apartamento demasiado largos")
     if user.role == "residente" and not (tower and apartment):
         raise HTTPException(400, "Un residente requiere torre y apartamento")
     celular = normalizar_celular(data.celular)
@@ -1271,7 +1277,7 @@ TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-
 @router.get("/residentes")
 def buscar_residentes(
     q: str = "",
-    guard: User = Depends(require_api("guarda", "piscina", "admin")),
+    guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
     query = db.query(User).filter(User.role == "residente", User.active.is_(True))
@@ -1867,3 +1873,52 @@ def toggle_user(
     db.commit()
     log.info("cuenta_%s username=%s por=%s", "activada" if user.active else "desactivada", user.username, admin.username)
     return {"ok": True, "active": user.active}
+
+
+@router.delete("/users/{user_id}")
+def eliminar_usuario(
+    user_id: int,
+    admin: User = Depends(require_api("admin")),
+    db: Session = Depends(get_db),
+):
+    """Borra una cuenta solo si no tiene historial: visitas, paquetes y control
+    de ediciones la referencian por FK y preservarlos exige no borrarla. Con
+    historial, la alternativa es desactivarla."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "Usuario no encontrado")
+    if user.id == admin.id:
+        raise HTTPException(400, "No puedes borrar tu propia cuenta")
+    visitas = (
+        db.query(Visit)
+        .filter(
+            or_(
+                Visit.resident_id == user.id,
+                Visit.entry_guard_id == user.id,
+                Visit.exit_guard_id == user.id,
+            )
+        )
+        .count()
+    )
+    paquetes = (
+        db.query(Package)
+        .filter(or_(Package.resident_id == user.id, Package.delivered_by == user.id))
+        .count()
+    )
+    ediciones = db.query(EditLog).filter(EditLog.editor_id == user.id).count()
+    if visitas or paquetes or ediciones:
+        partes = []
+        if visitas:
+            partes.append(f"{visitas} visitas")
+        if paquetes:
+            partes.append(f"{paquetes} paquetes")
+        if ediciones:
+            partes.append(f"{ediciones} ediciones")
+        raise HTTPException(
+            400, "Tiene historial (" + ", ".join(partes) + "); desactívala en lugar de borrarla"
+        )
+    username = user.username
+    db.delete(user)
+    db.commit()
+    log.info("cuenta_eliminada username=%s por=%s", username, admin.username)
+    return {"ok": True}

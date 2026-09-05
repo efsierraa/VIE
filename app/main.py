@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import traceback
 import uuid
 from contextlib import asynccontextmanager
 
@@ -37,6 +38,19 @@ _vie_log.handlers = [_handler]
 _vie_log.setLevel(logging.INFO)
 _vie_log.propagate = False
 
+def _relajar_full_name_legado(eng) -> bool:
+    """full_name es legado: en la BD vieja (Postgres) quedó NOT NULL y provoca
+    NotNullViolation en todo INSERT de usuario nuevo (SQLite no la exige)."""
+    if eng.dialect.name != "postgresql":
+        return False
+    col = next((c for c in inspect(eng).get_columns("users") if c["name"] == "full_name"), None)
+    if col is None or col["nullable"]:
+        return False
+    with eng.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE users ALTER COLUMN full_name DROP NOT NULL")
+    return True
+
+
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
     Base.metadata.create_all(engine)
@@ -54,6 +68,7 @@ def _ensure_schema():
                 u.nombres = partes[0] or u.username
                 u.apellidos = partes[1] if len(partes) > 1 else "-"
             db.commit()
+    _relajar_full_name_legado(engine)
     pkg_cols = {c["name"] for c in insp.get_columns("packages")}
     if "tercero" not in pkg_cols:
         # Postgres exige FALSE en un BOOLEAN; SQLite acepta 0
@@ -193,3 +208,18 @@ def forbidden_handler(request: Request, exc: web.PageForbidden):
         ),
         status_code=403,
     )
+
+
+@app.exception_handler(Exception)
+async def error_interno(request: Request, exc: Exception):
+    """Última red: un error no manejado queda en el log con traceback y contexto,
+    y el cliente recibe JSON (nunca HTML) para que el JS no rompa parseando."""
+    rid = request.headers.get("X-Request-Id", "?")
+    _vie_log.error(
+        "error_interno rid=%s metodo=%s ruta=%s traza=%s",
+        rid,
+        request.method,
+        request.url.path,
+        traceback.format_exc(limit=8),
+    )
+    return JSONResponse({"detail": "Error interno del servidor"}, status_code=500)
