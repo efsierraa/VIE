@@ -81,6 +81,18 @@ document.querySelectorAll("[data-2fa-reset]").forEach(btn => btn.addEventListene
   else alert(j.detail || "Error reiniciando 2FA");
 }));
 
+document.querySelectorAll("[data-eliminar]").forEach(btn => btn.addEventListener("click", async e => {
+  e.preventDefault();
+  const usuario = btn.dataset.usuario;
+  const escrito = prompt('Esto borra la cuenta "' + usuario + '" de forma permanente. Escribe "' + usuario + '" para confirmar:');
+  if (escrito === null) return;
+  if (escrito.trim() !== usuario) { alert("No coincide; no se borró nada"); return; }
+  const r = await fetch("/api/users/" + btn.dataset.eliminar, {method: "DELETE"});
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.ok) location.reload();
+  else alert(j.detail || "Error borrando la cuenta");
+}));
+
 document.getElementById("csv-form").addEventListener("submit", async e => {
   e.preventDefault();
   const archivo = document.getElementById("csv-file").files[0];
