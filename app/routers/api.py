@@ -493,8 +493,20 @@ def ingreso_piscina_nino(
         raise HTTPException(400, "Registra al menos un niño con su acompañante")
 
     fila_adulto = _fila_adulto(db, acompanante, guard)
-    creados = []
+    dentro = {
+        n.lower()
+        for (n,) in db.query(PoolAccess.menor_nombre)
+        .filter(PoolAccess.acompanante_acceso_id == fila_adulto.id, PoolAccess.exit_at.is_(None))
+        .all()
+        if n
+    }
+    creados, repetidos, vistos = [], [], set()
     for nombre, edad in limpios:
+        clave = nombre.lower()
+        if clave in dentro or clave in vistos:
+            repetidos.append(nombre)
+            continue
+        vistos.add(clave)
         fila = PoolAccess(
             persona_tipo="nino",
             resident_id=acompanante.id,
@@ -507,12 +519,15 @@ def ingreso_piscina_nino(
         )
         db.add(fila)
         creados.append(nombre)
+    if not creados:
+        db.rollback()
+        raise HTTPException(400, f"Ya están en la piscina con su acompañante: {', '.join(repetidos)}")
     db.commit()
     log.info("piscina_ingreso ninos=%s con=%s por=%s", ",".join(creados), acompanante.username, guard.username)
-    return {
-        "ok": True,
-        "message": f"{', '.join(creados)} entró a la piscina con {acompanante.nombre_completo}",
-    }
+    message = f"{', '.join(creados)} entró a la piscina con {acompanante.nombre_completo}"
+    if repetidos:
+        message += f" (ya estaban dentro: {', '.join(repetidos)})"
+    return {"ok": True, "message": message}
 
 
 @router.post("/piscina/ingreso-invitado")
@@ -525,6 +540,17 @@ def ingreso_piscina_invitado(
     opcionalmente con sus niños (que quedan ligados a su fila)."""
     padrino = _residente_piscina(db, data.padrino_id)
     nombre = _nombre_completo(data.nombres, data.apellidos, "del invitado")
+    existente = (
+        db.query(PoolAccess)
+        .filter(
+            PoolAccess.persona_tipo == "invitado",
+            PoolAccess.exit_at.is_(None),
+            func.lower(PoolAccess.invitado_nombre) == nombre.lower(),
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(400, f"{nombre} ya está en la piscina")
     limpios = _validar_ninos(data.ninos)
 
     fila_inv = PoolAccess(
@@ -538,7 +564,12 @@ def ingreso_piscina_invitado(
     db.add(fila_inv)
     db.flush()
     creados = [nombre]
+    vistos_inv = {nombre.lower()}
     for nino_nombre, nino_edad in limpios:
+        clave = nino_nombre.lower()
+        if clave in vistos_inv:
+            continue
+        vistos_inv.add(clave)
         db.add(
             PoolAccess(
                 persona_tipo="nino",

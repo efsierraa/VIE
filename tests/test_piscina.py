@@ -332,6 +332,44 @@ def test_ninos_del_residente_no_quedan_ligados_a_su_invitado(client):
     db.close()
 
 
+def test_invitado_duplicado_rechazado(client):
+    """El mismo invitado no entra dos veces: el reintento se rechaza con aviso claro."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    datos = {"nombres": "Doble", "apellidos": "Invitado", "padrino_id": rid, "ninos": []}
+    assert client.post("/api/piscina/ingreso-invitado", json=datos).status_code == 200
+    r = client.post("/api/piscina/ingreso-invitado", json=datos)
+    assert r.status_code == 400
+    assert "ya está en la piscina" in r.json()["detail"]
+
+
+def test_nino_repetido_rechazado_y_mixto_avisa(client):
+    """Reintentar un niño ya dentro no lo duplica: todo-repetido rechaza, mixto entra
+    solo el nuevo y avisa cuáles ya estaban."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    nino = {"nombres": "Doble", "apellidos": "Nino", "edad": 6}
+    r = client.post("/api/piscina/ingreso-nino", json={"acompanante_id": rid, "ninos": [nino]})
+    assert r.status_code == 200
+
+    r = client.post("/api/piscina/ingreso-nino", json={"acompanante_id": rid, "ninos": [dict(nino)]})
+    assert r.status_code == 400
+    assert "están en la piscina" in r.json()["detail"]
+
+    db = SessionLocal()
+    cuantos = db.query(PoolAccess).filter(PoolAccess.menor_nombre == "Doble Nino", PoolAccess.exit_at.is_(None)).count()
+    db.close()
+    assert cuantos == 1
+
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [dict(nino), {"nombres": "Nueva", "apellidos": "Nina", "edad": 4}]},
+    )
+    assert r.status_code == 200
+    assert "ya estaban dentro: Doble Nino" in r.json()["message"]
+    assert "Nueva Nina" in r.json()["message"]
+
+
 def test_busqueda_residentes_disponible_para_piscina(client):
     """El guarda de piscina busca residentes (acompañante/padrino) sin 403."""
     _piscina(client)
