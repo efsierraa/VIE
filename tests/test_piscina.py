@@ -527,3 +527,21 @@ def test_cuentas_ofrece_rol_piscina(client):
     login(client, "piscina2")
     page = client.get("/piscina")
     assert page.status_code == 200
+
+
+def test_contador_salida_sin_duplicar(client):
+    """Un niño abierto aparece en activos y en hoy; el botón debe contar la fila
+    una sola vez: 'Salir con 1' (el bug contaba 2 por procesar la fila dos veces)."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    client.post("/api/piscina/ingreso", json={"resident_id": rid})
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Unica", "apellidos": "Cuenta", "edad": 6}]},
+    )
+    assert r.status_code == 200
+
+    login(client, "piscina1")
+    page = client.get("/piscina").text
+    assert "Salir con 1" in page
+    assert "Salir con 2" not in page
