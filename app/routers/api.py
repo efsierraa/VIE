@@ -1286,7 +1286,7 @@ TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-
 @router.get("/residentes")
 def buscar_residentes(
     q: str = "",
-    guard: User = Depends(require_api("guarda")),
+    user: User = Depends(require_api("guarda", "piscina", "admin")),
     db: Session = Depends(get_db),
 ):
     query = db.query(User).filter(User.role == "residente", User.active.is_(True))

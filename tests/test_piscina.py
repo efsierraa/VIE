@@ -239,6 +239,15 @@ def test_maximo_ninos_rechazado(client):
     assert "Máximo" in r.json()["detail"]
 
 
+def test_busqueda_residentes_disponible_para_piscina(client):
+    """El guarda de piscina busca residentes (acompañante/padrino) sin 403."""
+    _piscina(client)
+    r = client.get("/api/residentes?q=Residenta")
+    assert r.status_code == 200
+    datos = r.json()["residentes"]
+    assert datos and datos[0]["username"] == "residente1"
+
+
 def test_roles_piscina_aislados(client):
     _piscina(client)
     page = client.get("/piscina")
