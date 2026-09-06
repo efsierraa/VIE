@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, Response
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, require_api, verify_password
@@ -524,7 +525,11 @@ def ingreso_piscina_nino(
     if not creados:
         db.rollback()
         raise HTTPException(400, f"Ya están en la piscina con su acompañante: {', '.join(repetidos)}")
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "Ese niño ya está registrado dentro de la piscina")
     log.info("piscina_ingreso ninos=%s con=%s por=%s", ",".join(creados), acompanante.username, guard.username)
     message = f"{', '.join(creados)} entró a la piscina con {acompanante.nombre_completo}"
     if repetidos:
@@ -585,7 +590,11 @@ def ingreso_piscina_invitado(
             )
         )
         creados.append(nino_nombre)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, f"{nombre} ya está en la piscina")
     log.info("piscina_ingreso invitado=%s padrino=%s por=%s", nombre, padrino.username, guard.username)
     return {
         "ok": True,
