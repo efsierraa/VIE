@@ -25,7 +25,7 @@
       <td>
         {% if f.persona_tipo != "nino" %}
         {% if e.ninos %}
-        <button class="small" data-salir="{{ f.id }}" data-persona="{{ e.persona }}" data-ninos="{{ e.ninos|join(', ') }}">Salir con {{ e.ninos|length }}</button>
+        <button class="small" data-salir="{{ f.id }}" data-persona="{{ e.persona }}" data-ninos="{{ e.ninos|join(', ') }}" title="{{ e.ninos_detalle }}">Salir con {{ e.ninos|length }}</button>
         {% else %}
         <button class="small" data-salir="{{ f.id }}" data-persona="{{ e.persona }}" data-ninos="">Salir</button>
         {% endif %}
