@@ -11,7 +11,7 @@ import openpyxl
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_
+from sqlalchemy import and_, false, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -39,7 +39,7 @@ from app.models import (
     Visit,
     User,
 )
-from app.routers.api import qr_data_uri
+from app.routers.api import TORRE_APTO_RE, qr_data_uri
 from app.security import sign_package
 from app.utils import format_duration, utcnow
 
@@ -645,24 +645,29 @@ def piscina_page(
 ):
     abiertos = db.query(PoolAccess).filter(PoolAccess.exit_at.is_(None))
     if q.strip():
+        texto = q.strip()
         condiciones = []
-        for token in q.strip().split():
+        m = TORRE_APTO_RE.match(texto)
+        if m:
+            torre = (m.group(1) or m.group(2)).upper()
+            condiciones.append(and_(PoolAccess.tower == torre, PoolAccess.apartment.ilike(m.group(3))))
+        for token in [t for t in texto.split() if not t.isdigit()]:
             like = f"%{token}%"
-            condiciones.append(
-                or_(PoolAccess.menor_nombre.ilike(like), PoolAccess.invitado_nombre.ilike(like))
-            )
+            por_nombre = or_(PoolAccess.menor_nombre.ilike(like), PoolAccess.invitado_nombre.ilike(like))
             rids = [
                 u.id
-                for u in db.query(User)
+                for u in db.query(User.id)
                 .filter(
                     User.role == "residente",
                     or_(User.nombres.ilike(like), User.apellidos.ilike(like), User.username.ilike(like)),
                 )
                 .all()
             ]
-            if rids:
-                condiciones.append(PoolAccess.resident_id.in_(rids))
-        abiertos = abiertos.filter(or_(*condiciones))
+            condiciones.append(or_(por_nombre, PoolAccess.resident_id.in_(rids)) if rids else por_nombre)
+        if condiciones:
+            abiertos = abiertos.filter(or_(*condiciones))
+        else:
+            abiertos = abiertos.filter(false())  # número sin su par (torre o apto solo): sin resultados
     activos, a_ant, a_sig = paginar(abiertos.order_by(PoolAccess.entry_at.desc()), _pagina(pagina_a), 25)
 
     today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()

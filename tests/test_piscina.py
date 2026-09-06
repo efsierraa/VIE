@@ -370,6 +370,40 @@ def test_nino_repetido_rechazado_y_mixto_avisa(client):
     assert "Nueva Nina" in r.json()["message"]
 
 
+def test_busqueda_pool_por_destino_y_nombres(client):
+    """El buscador de 'En la piscina ahora' encuentra por T·apto y por nombres
+    (niño, invitado o acompañante); número sin su par no arroja resultados."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    db = SessionLocal()
+    u = db.query(User).filter(User.id == rid).first()
+    destino = f"T{u.tower} {u.apartment}"  # administración puede haber movido al residente en otros tests
+    db.close()
+    client.post("/api/piscina/ingreso", json={"resident_id": rid})
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Busca", "apellidos": "Mucho", "edad": 5}]},
+    )
+    assert r.status_code == 200
+
+    login(client, "piscina1")
+    page = client.get("/piscina", params={"q": destino}).text
+    assert "Busca Mucho" in page
+    assert "Piscina vacía" not in page
+
+    page = client.get("/piscina", params={"q": "Busca"}).text  # nombre del niño
+    assert "Busca Mucho" in page
+
+    page = client.get("/piscina", params={"q": "Residente Dos"}).text  # acompañante residente
+    assert "Busca Mucho" in page
+
+    page = client.get("/piscina", params={"q": "202"}).text  # apto sin torre: nada
+    assert "Piscina vacía" in page
+
+    page = client.get("/piscina").text
+    assert "Busca Mucho" in page
+
+
 def test_busqueda_residentes_disponible_para_piscina(client):
     """El guarda de piscina busca residentes (acompañante/padrino) sin 403."""
     _piscina(client)
