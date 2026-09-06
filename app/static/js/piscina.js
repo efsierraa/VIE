@@ -51,7 +51,8 @@ function filaNino() {
   const div = document.createElement("div");
   div.className = "row fila-nino";
   div.innerHTML =
-    '<label>Nombres y apellidos <input class="nino-nombre" maxlength="80" placeholder="Ej: Ana Sofía Pérez"></label>' +
+    '<label>Nombres <input class="nino-nombres" maxlength="40" placeholder="Ej: Ana Sofía"></label>' +
+    '<label>Apellidos <input class="nino-apellidos" maxlength="40" placeholder="Ej: Pérez Gómez"></label>' +
     '<label>Edad (opcional) <input class="nino-edad" inputmode="numeric" size="3"></label>' +
     '<button type="button" class="small quitar-nino" aria-label="Quitar">✕</button>';
   return div;
@@ -77,7 +78,8 @@ function listaNinos(contenedorId, btnMasId) {
   sincronizar();
   return () =>
     [...cont.querySelectorAll(".fila-nino")].map(f => ({
-      nombre: f.querySelector(".nino-nombre").value.trim(),
+      nombres: f.querySelector(".nino-nombres").value.trim(),
+      apellidos: f.querySelector(".nino-apellidos").value.trim(),
       edad: f.querySelector(".nino-edad").value.trim(),
     }));
 }
@@ -89,13 +91,12 @@ function ninosValidados(valores) {
   const ninos = [];
   for (let i = 0; i < valores.length; i++) {
     const v = valores[i];
-    if (!v.nombre && !v.edad) continue;
-    if (!v.nombre) { alert("Digita el nombre del niño en la fila " + (i + 1)); return null; }
-    if (v.nombre.split(/\s+/).length < 2) {
-      alert("Registra al niño de la fila " + (i + 1) + " con nombres y apellidos (Ej: Ana Sofía Pérez)");
+    if (!v.nombres && !v.apellidos && !v.edad) continue;
+    if (!v.nombres || !v.apellidos) {
+      alert("Completa nombres y apellidos del niño en la fila " + (i + 1));
       return null;
     }
-    ninos.push({nombre: v.nombre, edad: v.edad === "" ? null : parseInt(v.edad, 10)});
+    ninos.push({nombres: v.nombres, apellidos: v.apellidos, edad: v.edad === "" ? null : parseInt(v.edad, 10)});
   }
   if (ninos.length > 10) { alert("Máximo 10 niños por registro"); return null; }
   return ninos;
@@ -119,12 +120,14 @@ document.getElementById("btn-ingreso-nino").addEventListener("click", async () =
 document.getElementById("btn-ingreso-invitado").addEventListener("click", async () => {
   const rid = seleccionado();
   if (rid === null) return;
-  const nombre = document.getElementById("pis-invitado-nombre").value.trim();
-  if (!nombre) { alert("Digita el nombre del invitado"); return; }
+  const nombres = document.getElementById("pis-invitado-nombres").value.trim();
+  const apellidos = document.getElementById("pis-invitado-apellidos").value.trim();
+  if (!nombres || !apellidos) { alert("Digita los nombres y los apellidos del invitado"); return; }
   const ninos = ninosValidados(ninosInvitado());
   if (ninos === null) return;
   const r = await fetch("/api/piscina/ingreso-invitado", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-    nombre,
+    nombres,
+    apellidos,
     padrino_id: rid,
     ninos,
   })});

@@ -369,12 +369,14 @@ def visit_pass(
 
 
 class NinoIn(BaseModel):
-    nombre: str
+    nombres: str
+    apellidos: str
     edad: int | None = None
 
 
 class InvitadoPiscinaIn(BaseModel):
-    nombre: str
+    nombres: str
+    apellidos: str
     padrino_id: int
     ninos: list[NinoIn] = []
 
@@ -391,23 +393,33 @@ class IngresoNinoIn(BaseModel):
 MAX_NINOS_PISCINA = 10
 
 
+def _nombre_completo(nombres: str, apellidos: str, quien: str) -> str:
+    """Nombres y apellidos por separado (como toda la app), unidos en el nombre
+    completo que se guarda y muestra. Ambos campos son obligatorios."""
+    nombres = (nombres or "").strip()
+    apellidos = (apellidos or "").strip()
+    if not nombres:
+        raise HTTPException(400, f"Los nombres {quien} son obligatorios")
+    if not apellidos:
+        raise HTTPException(400, f"Los apellidos {quien} son obligatorios")
+    if len(nombres) > 40 or len(apellidos) > 40:
+        raise HTTPException(400, f"Nombres o apellidos {quien} demasiado largos")
+    completo = f"{nombres} {apellidos}"
+    if len(completo) > 80:
+        raise HTTPException(400, f"El nombre completo {quien} es demasiado largo")
+    return completo
+
+
 def _validar_ninos(ninos: list[NinoIn]) -> list[tuple[str, int | None]]:
     """Reglas compartidas por acompañante residente e invitado. Devuelve la lista
-    limpia (nombre completo en dos palabras, edad opcional) lista para registrar."""
+    limpia (nombre completo, edad) lista para registrar."""
     if len(ninos) > MAX_NINOS_PISCINA:
         raise HTTPException(400, f"Máximo {MAX_NINOS_PISCINA} niños por registro")
     limpios = []
     for n in ninos:
-        nombre = (n.nombre or "").strip()
-        if not nombre:
-            raise HTTPException(400, "El nombre del niño es obligatorio")
-        if len(nombre.split()) < 2:
-            raise HTTPException(400, f"Registra a {nombre} con nombres y apellidos")
-        if len(nombre) > 80:
-            raise HTTPException(400, "El nombre del niño es demasiado largo")
         if n.edad is not None and not 0 <= n.edad <= 17:
             raise HTTPException(400, "La edad del niño debe estar entre 0 y 17")
-        limpios.append((nombre, n.edad))
+        limpios.append((_nombre_completo(n.nombres, n.apellidos, "del niño"), n.edad))
     return limpios
 
 
@@ -511,11 +523,7 @@ def ingreso_piscina_invitado(
     """Entrada de un invitado adulto (con nombre) ligado a un residente padrino,
     opcionalmente con sus niños (que quedan ligados a su fila)."""
     padrino = _residente_piscina(db, data.padrino_id)
-    nombre = (data.nombre or "").strip()
-    if not nombre:
-        raise HTTPException(400, "El nombre del invitado es obligatorio")
-    if len(nombre) > 80:
-        raise HTTPException(400, "El nombre del invitado es demasiado largo")
+    nombre = _nombre_completo(data.nombres, data.apellidos, "del invitado")
     limpios = _validar_ninos(data.ninos)
 
     fila_inv = PoolAccess(

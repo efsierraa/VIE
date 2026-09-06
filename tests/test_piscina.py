@@ -40,7 +40,7 @@ def test_ingreso_nino_crea_adulto_vinculados(client):
     rid = _piscina(client)
     r = client.post(
         "/api/piscina/ingreso-nino",
-        json={"acompanante_id": rid, "ninos": [{"nombre": "Juanito Pérez", "edad": 7}]},
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Juanito", "apellidos": "Pérez", "edad": 7}]},
     )
     assert r.status_code == 200
     assert "Juanito" in r.json()["message"]
@@ -53,16 +53,28 @@ def test_ingreso_nino_crea_adulto_vinculados(client):
     db.close()
 
 
-def test_nino_sin_nombre_y_acompanante_invalido_rechazados(client):
+def test_nino_incompleto_y_acompanante_invalido_rechazados(client):
     rid = _piscina(client)
-    r = client.post("/api/piscina/ingreso-nino", json={"acompanante_id": rid, "ninos": [{"nombre": "  "}]})
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [{"nombres": "", "apellidos": ""}]},
+    )
     assert r.status_code == 400
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Juanito", "apellidos": "  "}]},
+    )
+    assert r.status_code == 400
+    assert "apellidos" in r.json()["detail"]
 
     login(client, "piscina1")
     db = SessionLocal()
     gid = db.query(User).filter(User.username == "guarda1").first().id
     db.close()
-    r = client.post("/api/piscina/ingreso-nino", json={"acompanante_id": gid, "ninos": [{"nombre": "Sin Acomp"}]})
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": gid, "ninos": [{"nombres": "Sin", "apellidos": "Acomp"}]},
+    )
     assert r.status_code == 404  # el acompañante debe ser un residente
 
 
@@ -70,7 +82,12 @@ def test_ingreso_invitado_con_padrino_y_ninos(client):
     rid = _piscina(client)
     r = client.post(
         "/api/piscina/ingreso-invitado",
-        json={"nombre": "Visita Pool", "padrino_id": rid, "ninos": [{"nombre": "Nina Pool", "edad": 5}]},
+        json={
+            "nombres": "Visita",
+            "apellidos": "Pool",
+            "padrino_id": rid,
+            "ninos": [{"nombres": "Nina", "apellidos": "Pool", "edad": 5}],
+        },
     )
     assert r.status_code == 200
 
@@ -148,17 +165,21 @@ def _rid2(client):
 def test_ingreso_tres_ninos_una_sola_fila_adulto(client):
     """Un adulto entra con varios niños de una vez: una fila de adulto, N filas ligadas."""
     rid = _rid2(client)
-    nombres = ["Ana María Ruiz", "Luis Eduardo Ruiz", "Camila Ruiz"]
+    completos = ["Ana María Ruiz", "Luis Eduardo Ruiz", "Camila Ruiz"]
+    partes = [("Ana María", "Ruiz"), ("Luis Eduardo", "Ruiz"), ("Camila", "Ruiz")]
     r = client.post(
         "/api/piscina/ingreso-nino",
-        json={"acompanante_id": rid, "ninos": [{"nombre": n, "edad": i + 5} for i, n in enumerate(nombres)]},
+        json={
+            "acompanante_id": rid,
+            "ninos": [{"nombres": nom, "apellidos": ape, "edad": i + 5} for i, (nom, ape) in enumerate(partes)],
+        },
     )
     assert r.status_code == 200
-    for n in nombres:
+    for n in completos:
         assert n in r.json()["message"]
 
     db = SessionLocal()
-    filas = [db.query(PoolAccess).filter(PoolAccess.menor_nombre == n).first() for n in nombres]
+    filas = [db.query(PoolAccess).filter(PoolAccess.menor_nombre == n).first() for n in completos]
     assert all(f is not None and f.exit_at is None for f in filas)
     adultos = {f.acompanante_acceso_id for f in filas}
     assert len(adultos) == 1
@@ -178,15 +199,23 @@ def test_ingreso_tres_ninos_una_sola_fila_adulto(client):
 
 def test_invitado_con_varios_ninos_sale_en_grupo(client):
     rid = _rid2(client)
-    nombres = ["Pedrito Soto", "María Fe Soto"]
+    completos = ["Pedrito Soto", "María Fe Soto"]
     r = client.post(
         "/api/piscina/ingreso-invitado",
-        json={"nombre": "Invitada Varios", "padrino_id": rid, "ninos": [{"nombre": n, "edad": 4} for n in nombres]},
+        json={
+            "nombres": "Invitada",
+            "apellidos": "Varios",
+            "padrino_id": rid,
+            "ninos": [
+                {"nombres": "Pedrito", "apellidos": "Soto", "edad": 4},
+                {"nombres": "María Fe", "apellidos": "Soto", "edad": 9},
+            ],
+        },
     )
     assert r.status_code == 200
 
     db = SessionLocal()
-    ninos = [db.query(PoolAccess).filter(PoolAccess.menor_nombre == n).first() for n in nombres]
+    ninos = [db.query(PoolAccess).filter(PoolAccess.menor_nombre == n).first() for n in completos]
     assert all(n is not None for n in ninos)
     filas_inv = {n.acompanante_acceso_id for n in ninos}
     assert len(filas_inv) == 1
@@ -208,32 +237,38 @@ def test_invitado_sin_ninos(client):
     rid = _rid2(client)
     r = client.post(
         "/api/piscina/ingreso-invitado",
-        json={"nombre": "Invitado Solo", "padrino_id": rid, "ninos": []},
+        json={"nombres": "Invitado", "apellidos": "Solo", "padrino_id": rid, "ninos": []},
     )
     assert r.status_code == 200
 
 
-def test_nino_una_palabra_rechazado_en_ambos_ingresos(client):
-    """Los niños se registran con nombres y apellidos, sean de residente o de invitado."""
+def test_nombres_incompletos_rechazados_en_ambos_ingresos(client):
+    """Niños e invitados se registran con nombres y apellidos separados, ambos obligatorios."""
     rid = _rid2(client)
     r = client.post(
         "/api/piscina/ingreso-nino",
-        json={"acompanante_id": rid, "ninos": [{"nombre": "Juanito", "edad": 7}]},
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Juanito", "apellidos": "", "edad": 7}]},
     )
     assert r.status_code == 400
-    assert "nombres y apellidos" in r.json()["detail"]
+    assert "apellidos" in r.json()["detail"]
 
     r = client.post(
         "/api/piscina/ingreso-invitado",
-        json={"nombre": "Invitado Palabra", "padrino_id": rid, "ninos": [{"nombre": "Pedrito", "edad": 4}]},
+        json={"nombres": "Invitado", "apellidos": "  ", "padrino_id": rid, "ninos": [{"nombres": "Pedrito", "apellidos": "", "edad": 4}]},
     )
     assert r.status_code == 400
-    assert "nombres y apellidos" in r.json()["detail"]
+    assert "apellidos" in r.json()["detail"]
+
+    r = client.post(
+        "/api/piscina/ingreso-invitado",
+        json={"nombres": "Invitado", "apellidos": "", "padrino_id": rid, "ninos": []},
+    )
+    assert r.status_code == 400
 
 
 def test_maximo_ninos_rechazado(client):
     rid = _rid2(client)
-    ninos = [{"nombre": f"Niño Prueba {i}", "edad": 5} for i in range(11)]
+    ninos = [{"nombres": "Niño", "apellidos": f"Prueba {i}", "edad": 5} for i in range(11)]
     r = client.post("/api/piscina/ingreso-nino", json={"acompanante_id": rid, "ninos": ninos})
     assert r.status_code == 400
     assert "Máximo" in r.json()["detail"]
