@@ -424,8 +424,10 @@ def _validar_ninos(ninos: list[NinoIn]) -> list[tuple[str, int | None]]:
 
 
 def _residente_piscina(db: Session, resident_id: int) -> User:
-    """Un residente activo con torre y apartamento: el único que entra a la piscina."""
-    residente = db.get(User, resident_id)
+    """Un residente activo con torre y apartamento: el único que entra a la piscina.
+    El candado FOR UPDATE serializa ingresos concurrentes del mismo residente (doble
+    toque en el botón): el segundo espera, y al continuar ya ve los niños del primero."""
+    residente = db.get(User, resident_id, with_for_update=True)
     if residente is None or residente.role != "residente" or not residente.active:
         raise HTTPException(404, "Residente no encontrado")
     if not residente.tower or not residente.apartment:

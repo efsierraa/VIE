@@ -102,22 +102,29 @@ function ninosValidados(valores) {
   return ninos;
 }
 
-document.getElementById("btn-ingreso-nino").addEventListener("click", async () => {
+async function enviar(url, cuerpo, btn, errorPorDefecto) {
+  if (btn.disabled) return;  // un solo envío por toque: sin dobles registros
+  btn.disabled = true;
+  try {
+    const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(cuerpo)});
+    const j = await r.json();
+    if (r.ok && j.ok) { location.reload(); return; }
+    alert(j.detail || errorPorDefecto);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("btn-ingreso-nino").addEventListener("click", async e => {
   const rid = seleccionado();
   if (rid === null) return;
   const ninos = ninosValidados(ninosResidente());
   if (ninos === null) return;
   if (!ninos.length) { alert("Agrega al menos un niño con nombres y apellidos"); return; }
-  const r = await fetch("/api/piscina/ingreso-nino", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-    acompanante_id: rid,
-    ninos,
-  })});
-  const j = await r.json();
-  if (r.ok && j.ok) location.reload();
-  else alert(j.detail || "Error registrando la entrada del niño");
+  await enviar("/api/piscina/ingreso-nino", {acompanante_id: rid, ninos}, e.currentTarget, "Error registrando la entrada del niño");
 });
 
-document.getElementById("btn-ingreso-invitado").addEventListener("click", async () => {
+document.getElementById("btn-ingreso-invitado").addEventListener("click", async e => {
   const rid = seleccionado();
   if (rid === null) return;
   const nombres = document.getElementById("pis-invitado-nombres").value.trim();
@@ -125,15 +132,13 @@ document.getElementById("btn-ingreso-invitado").addEventListener("click", async 
   if (!nombres || !apellidos) { alert("Digita los nombres y los apellidos del invitado"); return; }
   const ninos = ninosValidados(ninosInvitado());
   if (ninos === null) return;
-  const r = await fetch("/api/piscina/ingreso-invitado", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
-    nombres,
-    apellidos,
-    padrino_id: rid,
-    ninos,
-  })});
-  const j = await r.json();
-  if (r.ok && j.ok) location.reload();
-  else alert(j.detail || "Error registrando la entrada del invitado");
+  await enviar("/api/piscina/ingreso-invitado", {nombres, apellidos, padrino_id: rid, ninos}, e.currentTarget, "Error registrando la entrada del invitado");
+});
+
+document.getElementById("btn-ingreso-adulto").addEventListener("click", async e => {
+  const rid = seleccionado();
+  if (rid === null) return;
+  await enviar("/api/piscina/ingreso", {resident_id: rid}, e.currentTarget, "Error registrando la entrada");
 });
 
 // Salida: el niño nunca sale solo — el botón del acompañante cierra al grupo
@@ -143,8 +148,14 @@ document.querySelectorAll("[data-salir]").forEach(btn => btn.addEventListener("c
     ? "¿Sale " + btn.dataset.persona + " con " + ninos + "? Todos quedan fuera de la piscina."
     : "¿Marcar la salida de " + btn.dataset.persona + " de la piscina?";
   if (!confirm(mensaje)) return;
-  const r = await fetch("/api/piscina/salida/" + btn.dataset.salir, {method: "POST"});
-  const j = await r.json();
-  if (r.ok && j.ok) { alert(j.message); location.reload(); }
-  else alert(j.detail || "Error registrando la salida");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/piscina/salida/" + btn.dataset.salir, {method: "POST"});
+    const j = await r.json();
+    if (r.ok && j.ok) { alert(j.message); location.reload(); }
+    else alert(j.detail || "Error registrando la salida");
+  } finally {
+    btn.disabled = false;
+  }
 }));

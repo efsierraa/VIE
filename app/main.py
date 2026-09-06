@@ -130,6 +130,23 @@ def _ensure_schema():
                 else:
                     conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} BOOLEAN DEFAULT {falso} NOT NULL")
 
+    # Piscina: un niño abierto no puede estar duplicado con el mismo acompañante
+    # (reintentos/doble toque crearon filas gemelas y contaban doble en las salidas).
+    # La migración elimina los duplicados históricos (conserva el más viejo) y el
+    # índice único parcial bloquea cualquier nuevo, aunque dos peticiones competan.
+    if "uq_pool_nino_abierto" not in {i["name"] for i in insp.get_indexes("pool_access")}:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "DELETE FROM pool_access WHERE persona_tipo = 'nino' AND exit_at IS NULL AND id NOT IN ("
+                "SELECT MIN(id) FROM pool_access WHERE persona_tipo = 'nino' AND exit_at IS NULL "
+                "GROUP BY acompanante_acceso_id, lower(menor_nombre))"
+            )
+            conn.exec_driver_sql(
+                "CREATE UNIQUE INDEX uq_pool_nino_abierto ON pool_access "
+                "(acompanante_acceso_id, lower(menor_nombre)) "
+                "WHERE persona_tipo = 'nino' AND exit_at IS NULL"
+            )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

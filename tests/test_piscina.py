@@ -3,9 +3,12 @@ e invitados con padrino; salida en grupo; admin supervisa con filtros y Excel.""
 import uuid as uuid_mod
 from datetime import timedelta
 
+import pytest
+
 from conftest import login
 
 from app.database import SessionLocal
+from app.main import _ensure_schema
 from app.models import PoolAccess, User
 from app.utils import utcnow
 
@@ -368,6 +371,34 @@ def test_nino_repetido_rechazado_y_mixto_avisa(client):
     assert r.status_code == 200
     assert "ya estaban dentro: Doble Nino" in r.json()["message"]
     assert "Nueva Nina" in r.json()["message"]
+
+
+def test_migracion_limpia_duplicados_y_bloquea_nuevos(client):
+    """La migración elimina niños abiertos duplicados (conserva el más viejo) y el
+    índice único bloquea todo reintento que llegue hasta la BD, aunque dos
+    peticiones competan por insertar."""
+    db = SessionLocal()
+    rid = db.query(User).filter(User.username == "residente2").first().id
+    adulto = PoolAccess(persona_tipo="adulto", resident_id=rid, tower="2", apartment="202")
+    db.add(adulto)
+    db.flush()
+    original = PoolAccess(persona_tipo="nino", resident_id=rid, acompanante_acceso_id=adulto.id, menor_nombre="Duplicado Test", tower="2", apartment="202")
+    gemelo = PoolAccess(persona_tipo="nino", resident_id=rid, acompanante_acceso_id=adulto.id, menor_nombre="Duplicado Test", tower="2", apartment="202")
+    db.add_all([original, gemelo])
+    db.commit()
+    id_viejo, id_nuevo = original.id, gemelo.id
+    db.close()
+
+    _ensure_schema()
+
+    db = SessionLocal()
+    quedan = db.query(PoolAccess).filter(PoolAccess.menor_nombre == "Duplicado Test").all()
+    assert [f.id for f in quedan] == [id_viejo]
+    with pytest.raises(Exception):
+        db.add(PoolAccess(persona_tipo="nino", resident_id=rid, acompanante_acceso_id=adulto.id, menor_nombre="Duplicado Test", tower="2", apartment="202"))
+        db.commit()
+    db.rollback()
+    db.close()
 
 
 def test_busqueda_pool_por_destino_y_nombres(client):
