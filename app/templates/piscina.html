@@ -50,7 +50,7 @@
 
 <section class="card">
   <h2>Registrar ingreso</h2>
-  <p class="hint">Solo residentes e invitados de un residente. El niño entra y sale siempre con su acompañante.</p>
+  <p class="hint">Solo residentes e invitados de un residente. El niño entra y sale siempre con su acompañante, y se registra con nombres y apellidos.</p>
   <label>Buscar residente (nombre o destino, Ej: T4 1005)
     <input id="pis-residente" placeholder="Ej: Mariana o T4 1005" autocomplete="off">
   </label>
@@ -61,13 +61,13 @@
     <button id="btn-ingreso-adulto" type="button">Entrada adulto</button>
   </div>
   <details class="card">
-    <summary>Entrada de niño (con este adulto)</summary>
+    <summary>Entrada de niños (con este adulto)</summary>
     <div class="form">
+      <div id="pis-ninos"></div>
       <div class="row">
-        <label>Nombre del niño <input id="pis-nino-nombre" maxlength="80"></label>
-        <label>Edad (opcional) <input id="pis-nino-edad" inputmode="numeric" size="3"></label>
+        <button id="btn-mas-nino" type="button" class="small">＋ Agregar otro niño</button>
+        <button id="btn-ingreso-nino" type="button">Entrada adulto + niños</button>
       </div>
-      <button id="btn-ingreso-nino" type="button">Entrada adulto + niño</button>
     </div>
   </details>
   <details class="card">
@@ -77,10 +77,9 @@
       <label>Padrino residente (búscalo arriba y selecciónalo)
         <input id="pis-padrino-muestra" readonly placeholder="Selecciona al residente arriba">
       </label>
-      <div class="row">
-        <label>Niño del invitado (opcional) <input id="pis-inv-nino" maxlength="80"></label>
-        <label>Edad (opcional) <input id="pis-inv-nino-edad" inputmode="numeric" size="3"></label>
-      </div>
+      <p class="hint">Niños del invitado (opcional, pueden ser varios):</p>
+      <div id="pis-inv-ninos"></div>
+      <button id="btn-mas-inv-nino" type="button" class="small">＋ Agregar niño del invitado</button>
       <button id="btn-ingreso-invitado" type="button">Entrada invitado</button>
     </div>
   </details>

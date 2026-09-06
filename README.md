@@ -22,7 +22,7 @@ La app cubre dos flujos — **personas** (visitas QR y piscina) y **paquetes** (
 
 **Celular opcional en todo**: perfiles, visitas y paquetes de terceros. Se muestra en las tablas e historiales (y en el Excel) y activa el botón **Enviar por WhatsApp** con el pase precargado — sin celular, el botón no aparece.
 
-**Piscina**: rol de guarda de piscina con entradas y salidas (adultos residentes, niños siempre con su acompañante — ni entran ni salen solos — e invitados ligados a un residente padrino), lista de "en la piscina" con buscador, y supervisión completa en el Historial de administración.
+**Piscina**: rol de guarda de piscina con entradas y salidas (adultos residentes, niños siempre con su acompañante — ni entran ni salen solos — y varios por adulto, registrados con nombres y apellidos, e invitados ligados a un residente padrino, también con sus niños), lista de "en la piscina" con buscador, y supervisión completa en el Historial de administración.
 
 ### Paquetes
 

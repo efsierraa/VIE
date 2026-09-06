@@ -388,6 +388,29 @@ class IngresoNinoIn(BaseModel):
     ninos: list[NinoIn]
 
 
+MAX_NINOS_PISCINA = 10
+
+
+def _validar_ninos(ninos: list[NinoIn]) -> list[tuple[str, int | None]]:
+    """Reglas compartidas por acompañante residente e invitado. Devuelve la lista
+    limpia (nombre completo en dos palabras, edad opcional) lista para registrar."""
+    if len(ninos) > MAX_NINOS_PISCINA:
+        raise HTTPException(400, f"Máximo {MAX_NINOS_PISCINA} niños por registro")
+    limpios = []
+    for n in ninos:
+        nombre = (n.nombre or "").strip()
+        if not nombre:
+            raise HTTPException(400, "El nombre del niño es obligatorio")
+        if len(nombre.split()) < 2:
+            raise HTTPException(400, f"Registra a {nombre} con nombres y apellidos")
+        if len(nombre) > 80:
+            raise HTTPException(400, "El nombre del niño es demasiado largo")
+        if n.edad is not None and not 0 <= n.edad <= 17:
+            raise HTTPException(400, "La edad del niño debe estar entre 0 y 17")
+        limpios.append((nombre, n.edad))
+    return limpios
+
+
 def _residente_piscina(db: Session, resident_id: int) -> User:
     """Un residente activo con torre y apartamento: el único que entra a la piscina."""
     residente = db.get(User, resident_id)
@@ -452,29 +475,19 @@ def ingreso_piscina_nino(
     """Entrada de niño(s) con su acompañante residente: una sola acción registra
     al adulto y a los niños vinculados. El niño ni entra ni sale solo."""
     acompanante = _residente_piscina(db, data.acompanante_id)
-    limpios = [(n.nombre or "").strip() for n in data.ninos]
-    limpios = [n for n in limpios if n]
+    limpios = _validar_ninos(data.ninos)
     if not limpios:
-        raise HTTPException(400, "El nombre del niño es obligatorio")
-    for n in limpios:
-        if len(n) > 80:
-            raise HTTPException(400, "El nombre del niño es demasiado largo")
-    for n in data.ninos:
-        if n.edad is not None and not 0 <= n.edad <= 17:
-            raise HTTPException(400, "La edad del niño debe estar entre 0 y 17")
+        raise HTTPException(400, "Registra al menos un niño con su acompañante")
 
     fila_adulto = _fila_adulto(db, acompanante, guard)
     creados = []
-    for n in data.ninos:
-        nombre = (n.nombre or "").strip()
-        if not nombre:
-            continue
+    for nombre, edad in limpios:
         fila = PoolAccess(
             persona_tipo="nino",
             resident_id=acompanante.id,
             acompanante_acceso_id=fila_adulto.id,
             menor_nombre=nombre,
-            menor_edad=n.edad,
+            menor_edad=edad,
             tower=acompanante.tower,
             apartment=acompanante.apartment,
             entry_guard_id=guard.id,
@@ -503,11 +516,7 @@ def ingreso_piscina_invitado(
         raise HTTPException(400, "El nombre del invitado es obligatorio")
     if len(nombre) > 80:
         raise HTTPException(400, "El nombre del invitado es demasiado largo")
-    for n in data.ninos:
-        if not (n.nombre or "").strip():
-            raise HTTPException(400, "El nombre de cada niño es obligatorio")
-        if n.edad is not None and not 0 <= n.edad <= 17:
-            raise HTTPException(400, "La edad del niño debe estar entre 0 y 17")
+    limpios = _validar_ninos(data.ninos)
 
     fila_inv = PoolAccess(
         persona_tipo="invitado",
@@ -520,20 +529,20 @@ def ingreso_piscina_invitado(
     db.add(fila_inv)
     db.flush()
     creados = [nombre]
-    for n in data.ninos:
+    for nino_nombre, nino_edad in limpios:
         db.add(
             PoolAccess(
                 persona_tipo="nino",
                 resident_id=padrino.id,
                 acompanante_acceso_id=fila_inv.id,
-                menor_nombre=(n.nombre or "").strip(),
-                menor_edad=n.edad,
+                menor_nombre=nino_nombre,
+                menor_edad=nino_edad,
                 tower=padrino.tower,
                 apartment=padrino.apartment,
                 entry_guard_id=guard.id,
             )
         )
-        creados.append((n.nombre or "").strip())
+        creados.append(nino_nombre)
     db.commit()
     log.info("piscina_ingreso invitado=%s padrino=%s por=%s", nombre, padrino.username, guard.username)
     return {

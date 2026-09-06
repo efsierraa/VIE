@@ -47,15 +47,69 @@ document.getElementById("btn-ingreso-adulto").addEventListener("click", async ()
   else alert(j.detail || "Error registrando la entrada");
 });
 
+function filaNino() {
+  const div = document.createElement("div");
+  div.className = "row fila-nino";
+  div.innerHTML =
+    '<label>Nombres y apellidos <input class="nino-nombre" maxlength="80" placeholder="Ej: Ana Sofía Pérez"></label>' +
+    '<label>Edad (opcional) <input class="nino-edad" inputmode="numeric" size="3"></label>' +
+    '<button type="button" class="small quitar-nino" aria-label="Quitar">✕</button>';
+  return div;
+}
+
+function listaNinos(contenedorId, btnMasId) {
+  const cont = document.getElementById(contenedorId);
+  const sincronizar = () => {
+    const filas = cont.querySelectorAll(".fila-nino");
+    filas.forEach(f => (f.querySelector(".quitar-nino").style.visibility = filas.length > 1 ? "visible" : "hidden"));
+  };
+  document.getElementById(btnMasId).addEventListener("click", () => {
+    cont.appendChild(filaNino());
+    sincronizar();
+  });
+  cont.addEventListener("click", e => {
+    const btn = e.target.closest(".quitar-nino");
+    if (!btn) return;
+    btn.closest(".fila-nino").remove();
+    sincronizar();
+  });
+  cont.appendChild(filaNino());
+  sincronizar();
+  return () =>
+    [...cont.querySelectorAll(".fila-nino")].map(f => ({
+      nombre: f.querySelector(".nino-nombre").value.trim(),
+      edad: f.querySelector(".nino-edad").value.trim(),
+    }));
+}
+
+const ninosResidente = listaNinos("pis-ninos", "btn-mas-nino");
+const ninosInvitado = listaNinos("pis-inv-ninos", "btn-mas-inv-nino");
+
+function ninosValidados(valores) {
+  const ninos = [];
+  for (let i = 0; i < valores.length; i++) {
+    const v = valores[i];
+    if (!v.nombre && !v.edad) continue;
+    if (!v.nombre) { alert("Digita el nombre del niño en la fila " + (i + 1)); return null; }
+    if (v.nombre.split(/\s+/).length < 2) {
+      alert("Registra al niño de la fila " + (i + 1) + " con nombres y apellidos (Ej: Ana Sofía Pérez)");
+      return null;
+    }
+    ninos.push({nombre: v.nombre, edad: v.edad === "" ? null : parseInt(v.edad, 10)});
+  }
+  if (ninos.length > 10) { alert("Máximo 10 niños por registro"); return null; }
+  return ninos;
+}
+
 document.getElementById("btn-ingreso-nino").addEventListener("click", async () => {
   const rid = seleccionado();
   if (rid === null) return;
-  const nombre = document.getElementById("pis-nino-nombre").value.trim();
-  const edadTxt = document.getElementById("pis-nino-edad").value.trim();
-  if (!nombre) { alert("Digita el nombre del niño"); return; }
+  const ninos = ninosValidados(ninosResidente());
+  if (ninos === null) return;
+  if (!ninos.length) { alert("Agrega al menos un niño con nombres y apellidos"); return; }
   const r = await fetch("/api/piscina/ingreso-nino", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
     acompanante_id: rid,
-    ninos: [{nombre, edad: edadTxt === "" ? null : parseInt(edadTxt, 10)}],
+    ninos,
   })});
   const j = await r.json();
   if (r.ok && j.ok) location.reload();
@@ -67,9 +121,8 @@ document.getElementById("btn-ingreso-invitado").addEventListener("click", async 
   if (rid === null) return;
   const nombre = document.getElementById("pis-invitado-nombre").value.trim();
   if (!nombre) { alert("Digita el nombre del invitado"); return; }
-  const nino = document.getElementById("pis-inv-nino").value.trim();
-  const edadTxt = document.getElementById("pis-inv-nino-edad").value.trim();
-  const ninos = nino ? [{nombre: nino, edad: edadTxt === "" ? null : parseInt(edadTxt, 10)}] : [];
+  const ninos = ninosValidados(ninosInvitado());
+  if (ninos === null) return;
   const r = await fetch("/api/piscina/ingreso-invitado", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
     nombre,
     padrino_id: rid,
