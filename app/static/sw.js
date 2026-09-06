@@ -1,4 +1,4 @@
-const CACHE = "vie-v2";
+const CACHE = "vie-v3";
 const ASSETS = ["/static/style.css", "/static/app.js", "/static/manifest.json"];
 
 self.addEventListener("install", (e) => {

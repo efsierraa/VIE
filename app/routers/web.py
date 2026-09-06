@@ -1,7 +1,9 @@
 import base64
+import hashlib
 import io
 import logging
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
@@ -48,6 +50,29 @@ BOGOTA = ZoneInfo("America/Bogota")
 
 HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente", "piscina": "/piscina"}
 templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
+
+_hash_estaticos: dict[str, tuple[float, str]] = {}
+
+
+def estatico(path: str) -> str:
+    """URL de un archivo estático con la versión impuesta por su contenido (?v=hash).
+    Al cambiar el archivo cambia la URL: ningún navegador sirve una versión vieja
+    de JS/CSS (sin esto, el caché heurístico del celular quedó días atrás y mostró
+    HTML nuevo con JS viejo)."""
+    rel = path.removeprefix("/static/")
+    archivo = Path("app/static") / rel
+    try:
+        mtime = archivo.stat().st_mtime
+    except OSError:
+        return path
+    cacheado = _hash_estaticos.get(path)
+    if cacheado is None or cacheado[0] != mtime:
+        cacheado = (mtime, hashlib.sha1(archivo.read_bytes()).hexdigest()[:10])
+        _hash_estaticos[path] = cacheado
+    return f"{path}?v={cacheado[1]}"
+
+
+templates.env.globals["estatico"] = estatico
 
 NAVEGACION = {
     "guarda": [

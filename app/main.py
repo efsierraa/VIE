@@ -142,8 +142,20 @@ async def lifespan(app: FastAPI):
     yield
 
 
+class EstaticosConCache(StaticFiles):
+    """Sirve /static con Cache-Control explícito. Sin esta cabecera los navegadores
+    aplican caché heurístico (10% de la antigüedad del Last-Modified) y un celular
+    puede quedar horas con un JS viejo. Con URLs versionadas (?v=hash) el caché de
+    un día es seguro: contenido nuevo ⇒ URL nueva ⇒ descarga inmediata."""
+
+    def file_response(self, *args, **kwargs):
+        respuesta = super().file_response(*args, **kwargs)
+        respuesta.headers["Cache-Control"] = "public, max-age=86400"
+        return respuesta
+
+
 app = FastAPI(title="VIE — Vigilancia de Ingresos y Egresos", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", EstaticosConCache(directory="app/static"), name="static")
 app.include_router(web.router)
 app.include_router(api.router)
 
