@@ -274,6 +274,64 @@ def test_maximo_ninos_rechazado(client):
     assert "Máximo" in r.json()["detail"]
 
 
+def _cerrar_abiertos_de(rid: int):
+    """Aísla pruebas: cierra las filas abiertas del residente (estado de tests previos)."""
+    db = SessionLocal()
+    for f in db.query(PoolAccess).filter(PoolAccess.resident_id == rid, PoolAccess.exit_at.is_(None)).all():
+        f.exit_at = utcnow()
+    db.commit()
+    db.close()
+
+
+def test_padrino_entra_aun_con_invitado_dentro(client):
+    """El invitado dentro no cuenta como el padrino dentro: este puede entrar."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    r = client.post(
+        "/api/piscina/ingreso-invitado",
+        json={"nombres": "Invitado", "apellidos": "Anticipado", "padrino_id": rid, "ninos": []},
+    )
+    assert r.status_code == 200
+    r = client.post("/api/piscina/ingreso", json={"resident_id": rid})
+    assert r.status_code == 200
+    assert "entró a la piscina" in r.json()["message"]
+
+
+def test_ninos_del_residente_no_quedan_ligados_a_su_invitado(client):
+    """Registrar niños del padrino con su invitado dentro no traslada los niños a la
+    fila del invitado (era el bug del 'Salir con 4' con solo 2 niños)."""
+    rid = _rid2(client)
+    _cerrar_abiertos_de(rid)
+    r = client.post(
+        "/api/piscina/ingreso-invitado",
+        json={
+            "nombres": "Invitado",
+            "apellidos": "Cofundido",
+            "padrino_id": rid,
+            "ninos": [{"nombres": "Nina", "apellidos": "Propia", "edad": 5}],
+        },
+    )
+    assert r.status_code == 200
+
+    r = client.post(
+        "/api/piscina/ingreso-nino",
+        json={"acompanante_id": rid, "ninos": [{"nombres": "Hijo", "apellidos": "Del Padrino", "edad": 7}]},
+    )
+    assert r.status_code == 200
+
+    db = SessionLocal()
+    inv = db.query(PoolAccess).filter(
+        PoolAccess.persona_tipo == "invitado", PoolAccess.invitado_nombre == "Invitado Cofundido"
+    ).first()
+    hijo = db.query(PoolAccess).filter(PoolAccess.menor_nombre == "Hijo Del Padrino").first()
+    adulto = db.query(PoolAccess).filter(PoolAccess.id == hijo.acompanante_acceso_id).first()
+    assert hijo.acompanante_acceso_id != inv.id
+    assert adulto.persona_tipo == "adulto" and adulto.resident_id == rid
+    nina = db.query(PoolAccess).filter(PoolAccess.menor_nombre == "Nina Propia").first()
+    assert nina.acompanante_acceso_id == inv.id  # la niña del invitado sigue con él
+    db.close()
+
+
 def test_busqueda_residentes_disponible_para_piscina(client):
     """El guarda de piscina busca residentes (acompañante/padrino) sin 403."""
     _piscina(client)
@@ -302,6 +360,7 @@ def test_historial_piscina_con_filtros(client):
     page = client.get("/admin/historial?tipo=piscina").text
     assert "Piscina" in page
     assert "Juanito" in page
+    assert ">Niño<" in page  # la etiqueta del tipo lleva la ñ, no el valor crudo "nino"
 
     page = client.get("/admin/historial?tipo=piscina&torre=1").text
     assert "Juanito" in page  # el destino se hereda del residente

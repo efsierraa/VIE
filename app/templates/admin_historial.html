@@ -144,7 +144,7 @@
     {% set e = etiquetas_piscina[f.id] %}
     <tr>
       <td><strong>{{ e.persona }}</strong></td>
-      <td><span class="chip tipo-{{ f.persona_tipo }}">{{ f.persona_tipo }}</span></td>
+      <td><span class="chip tipo-{{ f.persona_tipo }}">{{ TIPO_LABEL[f.persona_tipo] }}</span></td>
       <td>{{ e.vinculo or "—" }}</td>
       <td>{{ e.destino }}</td>
       <td>{{ f.entry_at|dt }}</td>

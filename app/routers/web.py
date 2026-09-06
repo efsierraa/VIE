@@ -51,6 +51,9 @@ BOGOTA = ZoneInfo("America/Bogota")
 HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente", "piscina": "/piscina"}
 templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
 
+TIPO_LABEL = {"adulto": "Adulto", "nino": "Niño", "invitado": "Invitado"}  # el valor guardado es ASCII, la vista con ñ
+templates.env.globals["TIPO_LABEL"] = TIPO_LABEL
+
 _hash_estaticos: dict[str, tuple[float, str]] = {}
 
 
@@ -1056,7 +1059,7 @@ def exportar_visitas(
                 [
                     entrada.strftime("%d/%m/%Y") if entrada else "",
                     et.get(f.id, {}).get("persona", ""),
-                    f.persona_tipo,
+                    TIPO_LABEL.get(f.persona_tipo, f.persona_tipo),
                     et.get(f.id, {}).get("vinculo", ""),
                     et.get(f.id, {}).get("destino", ""),
                     entrada.strftime("%H:%M") if entrada else "",

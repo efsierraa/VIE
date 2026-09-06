@@ -434,12 +434,13 @@ def _residente_piscina(db: Session, resident_id: int) -> User:
 
 
 def _abierta_adulto(db: Session, resident_id: int):
-    """Fila 'dentro' del adulto residente (para no duplicar ni perder el vínculo)."""
+    """Fila 'dentro' del adulto residente (para no duplicar ni perder el vínculo).
+    Solo filas adulto: el invitado del residente no es el residente dentro."""
     return (
         db.query(PoolAccess)
         .filter(
             PoolAccess.resident_id == resident_id,
-            PoolAccess.persona_tipo.in_(("adulto", "invitado")),
+            PoolAccess.persona_tipo == "adulto",
             PoolAccess.exit_at.is_(None),
         )
         .first()
