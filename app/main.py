@@ -223,9 +223,13 @@ def health() -> JSONResponse:
 
 @app.middleware("http")
 async def cabeceras_seguridad(request: Request, call_next):
-    """Cabeceras básicas de seguridad en todas las respuestas."""
+    """Cabeceras básicas de seguridad en todas las respuestas. Las páginas HTML
+    nunca se guardan en caché: un HTML viejo del navegador mostraba conteos y
+    botones de un estado pasado (el 'con 2' fantasma tras un exito)."""
     respuesta = await call_next(request)
     h = respuesta.headers
+    if respuesta.headers.get("content-type", "").startswith("text/html"):
+        h["Cache-Control"] = "no-store"
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
     h.setdefault("Referrer-Policy", "same-origin")
