@@ -20,6 +20,7 @@ from app.auth import hash_password, require_api, verify_password
 from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
 from app.models import (
+    DIAS_AUTOCONFIRMACION,
     DIAS_FOTO_ENTREGADA,
     HORAS_VISITA_MANUAL,
     MINUTOS_GRACIA_EDICION,
@@ -1011,6 +1012,55 @@ def purgar_visitas_antiguas(db: Session, meses: int | None = None) -> int:
         db.commit()
         log.info("retencion_visitas_purgadas=%s meses=%s corte=%s", n, meses, corte.isoformat())
     return n
+
+
+def autoconfirmar_paquetes(db: Session) -> int:
+    """Regla de autoconfirmación: un paquete 'entregado' que el residente no
+    confirma en DIAS_AUTOCONFIRMACION días se confirma solo (confirmed_at = ahora).
+
+    Solo toca entregados: disputa, en_porteria y cancelado no participan.
+    Corre al arrancar y justo antes del weeksletter de los lunes.
+    """
+    corte = utcnow() - timedelta(days=DIAS_AUTOCONFIRMACION)
+    vencidos = (
+        db.query(Package)
+        .filter(Package.status == "entregado", Package.delivered_at.isnot(None), Package.delivered_at <= corte)
+        .all()
+    )
+    for p in vencidos:
+        p.status = "confirmado"
+        p.confirmed_at = utcnow()
+    if vencidos:
+        db.commit()
+        log.info("paquetes_autoconfirmados=%s dias=%s", len(vencidos), DIAS_AUTOCONFIRMACION)
+    return len(vencidos)
+
+
+def texto_recordatorio_paquetes(db: Session, resident_id: int) -> str | None:
+    """Recordatorio en tiempo real para el residente: se calcula al cargar su
+    página con lo que hay hoy en la BD (sin tabla de avisos ni horarios).
+
+    Devuelve None si no tiene entregados sin confirmar; si tiene, el texto
+    indica cuántos son y cuántos días quedan para la autoconfirmación.
+    """
+    entregados = (
+        db.query(Package)
+        .filter(Package.resident_id == resident_id, Package.status == "entregado", Package.delivered_at.isnot(None))
+        .all()
+    )
+    if not entregados:
+        return None
+    n = len(entregados)
+    dias_transcurridos = max((utcnow() - min(p.delivered_at for p in entregados)).days, 0)
+    dias_restantes = max(DIAS_AUTOCONFIRMACION - dias_transcurridos, 0)
+    plural = "" if n == 1 else "s"
+    dia = "" if dias_restantes == 1 else "s"
+    verbo = "queda" if dias_restantes == 1 else "quedan"
+    return (
+        f"Tienes {n} paquete{plural} entregado{plural} sin confirmar. "
+        f"{verbo.capitalize()} {dias_restantes} día{dia} para confirmar la recepción; "
+        "pasado el plazo se confirma automáticamente."
+    )
 
 
 @router.post("/admin/retencion/ejecutar")

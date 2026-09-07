@@ -139,6 +139,7 @@ async def lifespan(app: FastAPI):
         api.auto_finalizar_visitas(db)  # salida automática de visitas cuyo QR ya expiró
         api.asignar_codigos_faltantes(db)  # paquetes viejos sin código (tercero pre-QR)
         api.purgar_visitas_antiguas(db)  # SOC2/CC + habeas data: retención 12 meses
+        api.autoconfirmar_paquetes(db)  # regla de 30 días: entregados sin confirmar
     yield
 
 

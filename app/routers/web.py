@@ -3,7 +3,6 @@ import io
 import logging
 from datetime import datetime, time, timedelta, timezone
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo
 
 import openpyxl
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -37,14 +36,13 @@ from app.models import (
     Visit,
     User,
 )
-from app.routers.api import qr_data_uri
+from app.routers.api import qr_data_uri, texto_recordatorio_paquetes
 from app.security import sign_package
-from app.utils import format_duration, utcnow
+from app.utils import BOGOTA, format_duration, utcnow
 
 log = logging.getLogger("vie")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-BOGOTA = ZoneInfo("America/Bogota")
 
 HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente"}
 templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
@@ -155,6 +153,8 @@ def paquetes_con_nombres(db: Session, pkgs: list[Package]) -> list[dict]:
                 "celular": (p.tercero_celular or "") if p.tercero else (residente.celular if residente else ""),
                 "destino": destino,
                 "entrego": usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
+                # inspección admin: días que lleva entregado sin confirmar (autoconfirmación a 30)
+                "dias_sin_confirmar": (utcnow() - p.delivered_at).days if p.status == "entregado" and p.delivered_at else None,
             }
         )
     return out
@@ -423,6 +423,8 @@ def residente_page(
         .filter(Package.resident_id == user.id, Package.status == "en_porteria")
         .count()
     )
+    # recordatorio en tiempo real: se calcula al cargar con lo que hay hoy
+    aviso = texto_recordatorio_paquetes(db, user.id)
     return templates.TemplateResponse(
         request,
         "residente.html",
@@ -431,6 +433,7 @@ def residente_page(
             "visits": visits,
             "paquetes": paquetes,
             "pendientes": pendientes,
+            "aviso": aviso,
             "pager_v": pager(_pagina(pagina_v), v_ant, v_sig, "/residente", {}, "pagina_v"),
             "pager_p": pager(_pagina(pagina_p), p_ant, p_sig, "/residente", {}, "pagina_p"),
             "tabs": [],
@@ -547,6 +550,7 @@ def admin_page(
         "pendientes": db.query(Visit).filter(Visit.status == "pendiente").count(),
         "paquetes": db.query(Package).filter(Package.status == "en_porteria").count(),
         "sin_residente": db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria").count(),
+        "sin_confirmar": db.query(Package).filter(Package.status == "entregado").count(),
         "activos": db.query(User).filter(User.active.is_(True)).count(),
     }
     return templates.TemplateResponse(

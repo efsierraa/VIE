@@ -28,7 +28,8 @@ La app se organiza en **páginas por sección** con una barra de navegación inf
 2. El residente ve el aviso en su app: foto, descripción, código corto y **QR para reclamarlo**.
 3. En portería el residente muestra el QR → el guarda **ve la foto** → busca el paquete → **"Marcar entregado"**.
 4. El residente **confirma la recepción** (o marca "No lo recibí" → queda en disputa para administración).
-5. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
+5. Si no confirma en **30 días**, el paquete se **autoconfirma**; su app le muestra un **recordatorio en tiempo real** con los días que le quedan (cerrable, regla completa en [docs/paquetes-confirmacion.md](docs/paquetes-confirmacion.md)); administración inspecciona los pendientes desde el dashboard e historial.
+6. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
 
 ### Paquetes para alguien NO registrado
 
