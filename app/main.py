@@ -105,6 +105,9 @@ def _ensure_schema():
     if "tercero_celular" not in pkg_cols:
         with engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero_celular VARCHAR(20)")
+    if "metodo_entrega" not in pkg_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN metodo_entrega VARCHAR(20)")
     usr_cols = {c["name"] for c in insp.get_columns("users")}
     if "celular" not in usr_cols:
         with engine.begin() as conn:

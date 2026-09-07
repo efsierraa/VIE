@@ -47,9 +47,9 @@ async function enviarCamara(token) {
   }
   if (j.tipo === "paquete") {
     if (j.package.tercero) {
-      renderTercero(j.package, resultBody);  // reclamo con cédula: la foto ayuda a cotejar
+      renderTercero(j.package, resultBody, token);  // reclamo con cédula: la foto ayuda a cotejar
     } else {
-      renderPaquete(j, resultBody);
+      renderPaquete(j, resultBody, token);
     }
     resultCard.classList.remove("hidden");
     guiarA(resultCard, true);
@@ -66,21 +66,23 @@ async function enviarCamara(token) {
   }
 }
 
-function renderPaquete(j, box) {
+function renderPaquete(j, box, token) {
   box.innerHTML =
     '<img src="' + j.package.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
     '<p><strong>' + esc(j.residente.nombre) + '</strong> · Torre ' + esc(j.residente.tower) + ' · ' + esc(j.residente.apartment) +
     (j.package.description ? '<br>' + esc(j.package.description) : '') + '</p>' +
+    (token ? '<p class="hint">Reclamo verificado por QR: queda como evidencia de la entrega.</p>' : '') +
     '<button id="btn-entregar" type="button">Marcar entregado</button>';
   enlazarEntregar(
     j.package.uuid,
     box,
     "Paquete entregado. El residente debe confirmar en su app.",
-    "¿Confirmas que entregaste el paquete a " + j.residente.nombre + " (Torre " + j.residente.tower + " · " + j.residente.apartment + ")?"
+    "¿Confirmas que entregaste el paquete a " + j.residente.nombre + " (Torre " + j.residente.tower + " · " + j.residente.apartment + ")?",
+    token
   );
 }
 
-function renderTercero(p, box) {
+function renderTercero(p, box, token) {
   const quien = p.tercero_nombres
     ? 'Nombres: ' + esc(p.tercero_nombres) + ' · <strong>Apellidos: ' + esc(p.tercero_apellidos) + '</strong>'
     : '<strong>' + esc(p.nombre_tercero) + '</strong>';
@@ -89,6 +91,7 @@ function renderTercero(p, box) {
     '<img src="' + p.photo_data_uri + '" class="pkg-preview" alt="Foto del paquete">' +
     '<p>' + quien +
     (p.description ? '<br>' + esc(p.description) : '') + '</p>' +
+    (token ? '<p class="hint">Reclamo verificado por QR.</p>' : '') +
     '<label>Cédula de quien reclama (se cotejan nombres y apellidos con la cédula física)' +
     '<input id="tercero-cedula" maxlength="30" inputmode="numeric" autocomplete="off"></label>' +
     '<button id="btn-entregar" type="button">Marcar entregado</button>';
@@ -96,10 +99,10 @@ function renderTercero(p, box) {
     const cedula = document.getElementById("tercero-cedula").value.trim();
     if (!cedula) { alert("Digita el número de cédula de quien reclama"); return; }
     if (!confirm("¿Confirmas que entregaste el paquete a " + nombreCompleto + " (cédula " + cedula + ")?")) return;
-    const r2 = await fetch("/api/packages/" + p.uuid + "/entregar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({cedula})});
+    const r2 = await fetch("/api/packages/" + p.uuid + "/entregar", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({cedula, token})});
     const j2 = await r2.json();
     if (r2.ok && j2.ok) {
-      box.innerHTML = '<p class="alert ok">Paquete entregado. Cédula registrada como evidencia.</p>';
+      box.innerHTML = '<p class="alert ok">Paquete entregado. Cédula registrada como evidencia' + (token ? '; reclamo verificado por QR.' : '.') + '</p>';
       setTimeout(() => location.reload(), 2500);
     } else {
       box.innerHTML = '<p class="alert error">' + esc(j2.detail || "Error") + '</p>';
@@ -107,10 +110,13 @@ function renderTercero(p, box) {
   });
 }
 
-function enlazarEntregar(uuid, box, mensajeOk, confirmMsg) {
+function enlazarEntregar(uuid, box, mensajeOk, confirmMsg, token) {
   document.getElementById("btn-entregar").addEventListener("click", async () => {
     if (confirmMsg && !confirm(confirmMsg)) return;
-    const r2 = await fetch("/api/packages/" + uuid + "/entregar", {method: "POST"});
+    const opciones = token
+      ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({token})}
+      : {method: "POST"};
+    const r2 = await fetch("/api/packages/" + uuid + "/entregar", opciones);
     const j2 = await r2.json();
     if (r2.ok && j2.ok) {
       box.innerHTML = '<p class="alert ok">' + esc(mensajeOk) + '</p>';
