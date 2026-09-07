@@ -85,6 +85,10 @@ class Package(Base):
     delivered_at = Column(DateTime)
     delivered_by = Column(Integer, ForeignKey("users.id"))
     confirmed_at = Column(DateTime)
+    # evidencia de la entrega: "qr" (reclamo firmado escaneado en portería),
+    # "codigo" (código corto digitado) o "busqueda" (no registrado hallado por nombre).
+    # NULL = entregado antes del registro de métodos (sin exoneración documentada)
+    metodo_entrega = Column(String(20))
     photo_delete_after = Column(DateTime)  # la foto se borra sola 30 días tras la entrega
 
     # Paquete para alguien sin cuenta: se registra con el nombre del destinatario

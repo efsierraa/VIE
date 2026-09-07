@@ -871,7 +871,7 @@ def _hoja_paquetes(wb, pkgs, usuarios):
     ws.append(
         [
             "Fecha registro", "Destinatario", "Cédula", "Celular", "Torre", "Apartamento", "Descripción",
-            "Estado", "Entregado", "Confirmado", "Entregó",
+            "Estado", "Entregado", "Confirmado", "Entregó", "Método",
         ]
     )
     for p in pkgs:
@@ -902,5 +902,6 @@ def _hoja_paquetes(wb, pkgs, usuarios):
                 entregado.strftime("%d/%m/%Y %H:%M") if entregado else "",
                 confirmado.strftime("%d/%m/%Y %H:%M") if confirmado else "",
                 usuarios[p.delivered_by].nombre_completo if p.delivered_by and p.delivered_by in usuarios else "",
+                {"qr": "QR", "codigo": "código", "busqueda": "búsqueda"}.get(p.metodo_entrega or "", ""),
             ]
         )
