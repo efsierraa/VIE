@@ -94,17 +94,3 @@ document.querySelectorAll("[data-cancel]").forEach(btn => btn.addEventListener("
   if (r.ok) location.reload();
   else { const j = await r.json(); alert(j.detail || "No se pudo cancelar"); }
 }));
-
-// Recordatorio de paquetes: se cierra con la ✕ y no vuelve hasta que cambie
-// su contenido (otros paquetes o menos días restantes); se recalcula en cada carga
-const avisoCard = document.getElementById("aviso-card");
-if (avisoCard) {
-  const CLAVE = "vie-recordatorio-paquetes";
-  let contenido = avisoCard.dataset.aviso || "";
-  try {
-    if (localStorage.getItem(CLAVE) === contenido) avisoCard.classList.add("hidden");
-  } catch (e) {}
-  avisoCard.querySelector("[data-cerrar]").addEventListener("click", () => {
-    try { localStorage.setItem(CLAVE, contenido); } catch (e) {}
-  });
-}

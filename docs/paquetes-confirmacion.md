@@ -26,9 +26,10 @@ Al arrancar la app (lifespan, junto con los demás barridos automáticos de
   cuántos paquetes `entregado` sin confirmar tiene el residente y **cuántos
   días quedan** para la autoconfirmación (según la entrega más antigua).
 - No hay horarios ni tabla de avisos: si entra hoy, ve el estado de hoy.
-- El residente puede **cerrarlo con la ✕** de la esquina superior derecha; el
-  cierre queda en el navegador (`localStorage`) y el banner **no vuelve hasta
-  que cambie su contenido** (otro paquete o menos días restantes).
+- El residente puede **cerrarlo con la ✕** de la esquina superior derecha, pero
+  el cierre es **momentáneo**: mientras haya paquetes sin confirmar, el letrero
+  vuelve con cada carga de la página (F5) y desaparece solo cuando ya no
+  quedan paquetes por confirmar.
 
 ## Inspección por administración
 
