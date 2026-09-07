@@ -147,11 +147,13 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
   }
 });
 
-document.getElementById("pkg-scan-form").addEventListener("submit", async e => {
+document.getElementById("pkg-scan-form").addEventListener("submit", e => {
   e.preventDefault();
-  const code = document.getElementById("pkg-code").value.trim().toUpperCase();
+  const raw = document.getElementById("pkg-code").value.trim();
+  // corto (≤8 caracteres, sin puntos) se manda como código; el resto, como QR firmado
+  const esCorto = raw.length <= 8 && !raw.includes(".");
+  buscarPaquete(esCorto ? {code: raw.toUpperCase()} : {token: raw});
   document.getElementById("pkg-code").value = "";
-  buscarPaquete(code);
 });
 
 function buscarPaquete(payload) {
