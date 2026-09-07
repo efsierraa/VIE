@@ -127,3 +127,67 @@ def test_paginacion_y_busqueda_de_cuentas(client):
     # la búsqueda filtra: el usuario "masiva" no aparece en resultados de "Masiva017"
     resultados = page.split("<tbody>")[1].split("</tbody>")[0]
     assert "masiva054" not in resultados
+
+
+def test_busqueda_cuentas_por_celular_y_destino(client):
+    """Con cientos/miles de cuentas, el admin busca por celular o destino
+    (torre y apartamento), no solo por nombre."""
+    login(client, "admin1")
+    with SessionLocal() as db:
+        u = db.query(User).filter(User.username == "masiva002").first()
+        u.celular = "3209998877"
+        db.commit()
+    resultados = client.get("/admin/cuentas?q=320999").text.split("<tbody>")[1].split("</tbody>")[0]
+    assert "masiva002" in resultados
+    resultados = client.get("/admin/cuentas?q=902").text.split("<tbody>")[1].split("</tbody>")[0]
+    assert "masiva002" in resultados
+    assert "masiva003" not in resultados
+
+
+def test_filtro_cuentas_por_rol_y_estado(client):
+    login(client, "admin1")
+    from app.auth import hash_password
+
+    with SessionLocal() as db:
+        if not db.query(User).filter(User.username == "inactiva1").first():
+            db.add(
+                User(
+                    username="inactiva1",
+                    password_hash=hash_password("clave123"),
+                    nombres="Cuenta",
+                    apellidos="Inactiva",
+                    role="guarda",
+                    active=False,
+                )
+            )
+            db.commit()
+        esperadas_guardas = db.query(User).filter(User.role == "guarda").count()
+        esperadas_inactivas = db.query(User).filter(User.active.is_(False)).count()
+
+    page = client.get("/admin/cuentas?rol=guarda").text
+    assert f"{esperadas_guardas} cuentas (filtrado)" in page
+    tbody = page.split("<tbody>")[1].split("</tbody>")[0]
+    assert "guarda1" in tbody
+    assert "residente1" not in tbody
+    assert "admin1" not in tbody
+
+    page = client.get("/admin/cuentas?estado=inactiva").text
+    assert f"{esperadas_inactivas} cuenta" in page
+    tbody = page.split("<tbody>")[1].split("</tbody>")[0]
+    assert "inactiva1" in tbody
+    assert "residente1" not in tbody
+
+    # combinados: rol + estado + búsqueda acotada (hay más de 50 residentes)
+    page = client.get("/admin/cuentas?rol=residente&estado=activa&q=Resid").text
+    tbody = page.split("<tbody>")[1].split("</tbody>")[0]
+    assert "residente1" in tbody
+    assert "residente2" in tbody
+    assert "masiva001" not in tbody
+    assert "admin1" not in tbody
+
+
+def test_filtro_persiste_en_paginacion(client):
+    login(client, "admin1")
+    page = client.get("/admin/cuentas?rol=residente&pagina=2").text
+    assert "rol=residente" in page  # el paginador conserva el filtro
+    assert "pagina=1" in page

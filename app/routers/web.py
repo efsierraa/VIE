@@ -30,6 +30,7 @@ from app.limitador import registrar_intento, verificar_limite
 from app.models import (
     MINUTOS_GRACIA_EDICION,
     PACKAGE_STATUS,
+    ROLES,
     VISIT_STATUS,
     EditLog,
     Package,
@@ -576,6 +577,8 @@ def admin_cuentas_page(
     request: Request,
     user: User = Depends(require_page("admin")),
     q: str = "",
+    rol: str = "",
+    estado: str = "",
     pagina: str = "1",
     db: Session = Depends(get_db),
 ):
@@ -584,8 +587,22 @@ def admin_cuentas_page(
         for token in q.strip().split():
             like = f"%{token}%"
             query = query.filter(
-                or_(User.username.ilike(like), User.nombres.ilike(like), User.apellidos.ilike(like))
+                or_(
+                    User.username.ilike(like),
+                    User.nombres.ilike(like),
+                    User.apellidos.ilike(like),
+                    User.celular.ilike(like),
+                    User.tower.ilike(like),
+                    User.apartment.ilike(like),
+                )
             )
+    if rol in ROLES:
+        query = query.filter(User.role == rol)
+    if estado == "activa":
+        query = query.filter(User.active.is_(True))
+    elif estado == "inactiva":
+        query = query.filter(User.active.is_(False))
+    total = query.count()
     users, u_ant, u_sig = paginar(query, _pagina(pagina), 50)
     return templates.TemplateResponse(
         request,
@@ -594,7 +611,10 @@ def admin_cuentas_page(
             "user": user,
             "users": users,
             "f_q": q,
-            "pager_u": pager(_pagina(pagina), u_ant, u_sig, "/admin/cuentas", {"q": q}, "pagina"),
+            "f_rol": rol,
+            "f_estado": estado,
+            "total": total,
+            "pager_u": pager(_pagina(pagina), u_ant, u_sig, "/admin/cuentas", {"q": q, "rol": rol, "estado": estado}, "pagina"),
             "tabs": nav_de("admin", "cuentas"),
         },
     )

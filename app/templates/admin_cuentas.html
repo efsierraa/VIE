@@ -42,11 +42,33 @@
 
 <section class="card">
   <h2>Cuentas</h2>
-  <form method="get" action="/admin/cuentas" class="form inline">
-    <input name="q" value="{{ f_q }}" placeholder="Nombre o usuario" autocomplete="off">
-    <button type="submit">Buscar</button>
-    {% if f_q %}<a class="small" href="/admin/cuentas">Limpiar</a>{% endif %}
+  <form method="get" action="/admin/cuentas" class="form filters">
+    <div class="row">
+      <label>Buscar
+        <input name="q" value="{{ f_q }}" placeholder="Nombre, usuario, celular o destino" autocomplete="off">
+      </label>
+      <label>Rol
+        <select name="rol">
+          <option value="">Todos</option>
+          {% for r in ("admin", "guarda", "residente") %}
+          <option value="{{ r }}" {% if f_rol == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Estado
+        <select name="estado">
+          <option value="">Todas</option>
+          <option value="activa" {% if f_estado == "activa" %}selected{% endif %}>activa</option>
+          <option value="inactiva" {% if f_estado == "inactiva" %}selected{% endif %}>inactiva</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <button type="submit">Buscar</button>
+      {% if f_q or f_rol or f_estado %}<a class="button" href="/admin/cuentas">Limpiar</a>{% endif %}
+    </div>
   </form>
+  <p class="hint">{{ total }} cuenta{{ "" if total == 1 else "s" }}{% if f_q or f_rol or f_estado %} (filtrado){% endif %} · página {{ pager_u.pagina }} · destino escribe torre y apto juntos: T4 1005, 4-1005</p>
   <div class="table-wrap">
   {% if users %}
   <table>
