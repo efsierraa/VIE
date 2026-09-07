@@ -10,6 +10,7 @@ VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
+DIAS_AUTOCONFIRMACION = 30  # entregado sin confirmar tras 30 días se confirma solo (y dispara recordatorios)
 MESES_RETENCION_VISITAS = 12  # SOC2/CC + habeas data: visitas finalizadas/canceladas se purgan tras 12 meses
 MINUTOS_GRACIA_EDICION = 60  # el guarda puede editar lo suyo durante 1 hora
 HORAS_VISITA_MANUAL = 1  # el pase del ingreso manual vale 1 hora; más tiempo = registro del residente

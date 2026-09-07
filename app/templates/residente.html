@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Residente — VIE{% endblock %}
 {% block content %}
+{% if aviso %}
+<section class="card" id="aviso-card" data-aviso="{{ aviso }}">
+  <button type="button" class="cerrar-tarjeta" data-cerrar="aviso-card" aria-label="Cerrar">✕</button>
+  <p class="alert ok"><strong>Recordatorio:</strong> {{ aviso }}</p>
+</section>
+{% endif %}
 {% if pendientes %}
 <h1>Paquetes en portería ({{ pendientes }})</h1>
 <section class="card">
