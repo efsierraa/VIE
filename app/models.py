@@ -10,6 +10,7 @@ VISIT_STATUS = ("pendiente", "dentro", "finalizada", "cancelada")
 VALID_HOURS = (1, 2, 4, 8, 12, 24, 48, 168, 360, 720)  # hasta 30 días: visitas extendidas
 PACKAGE_STATUS = ("en_porteria", "entregado", "confirmado", "disputa", "cancelado")
 DIAS_FOTO_ENTREGADA = 30
+DIAS_AUTOCONFIRMACION = 30  # entregado sin confirmar tras 30 días se confirma solo (y dispara recordatorios)
 MESES_RETENCION_VISITAS = 12  # SOC2/CC + habeas data: visitas finalizadas/canceladas se purgan tras 12 meses
 MINUTOS_GRACIA_EDICION = 60  # el guarda puede editar lo suyo durante 1 hora
 HORAS_VISITA_MANUAL = 1  # el pase del ingreso manual vale 1 hora; más tiempo = registro del residente
@@ -84,6 +85,10 @@ class Package(Base):
     delivered_at = Column(DateTime)
     delivered_by = Column(Integer, ForeignKey("users.id"))
     confirmed_at = Column(DateTime)
+    # evidencia de la entrega: "qr" (reclamo firmado escaneado en portería),
+    # "codigo" (código corto digitado) o "busqueda" (no registrado hallado por nombre).
+    # NULL = entregado antes del registro de métodos (sin exoneración documentada)
+    metodo_entrega = Column(String(20))
     photo_delete_after = Column(DateTime)  # la foto se borra sola 30 días tras la entrega
 
     # Paquete para alguien sin cuenta: se registra con el nombre del destinatario

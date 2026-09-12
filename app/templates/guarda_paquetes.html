@@ -16,12 +16,12 @@
       <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
       <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span></td>
       <td>{{ item.p.created_at|dt }}</td>
-      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %} <button class="small" data-verqr-pkg="{{ item.p.uuid }}" data-nombre="{{ item.destinatario }}" data-cel="{{ item.celular }}">Ver QR</button></td>
+      <td>{% if item.p.uuid in editables %}<button class="small" data-editar-paquete="{{ item.p.uuid }}" data-nombres="{{ item.p.tercero_nombres or '' }}" data-apellidos="{{ item.p.tercero_apellidos or '' }}" data-cel="{{ item.p.tercero_celular or '' }}" data-torre="{{ item.p.tower }}" data-apto="{{ item.p.apartment }}" data-desc="{{ item.p.description or '' }}">Editar</button>{% endif %} {% if item.p.tercero %}<button class="small" data-verqr-pkg="{{ item.p.uuid }}" data-nombre="{{ item.destinatario }}" data-cel="{{ item.celular }}">Ver QR</button>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
-  <p class="hint">Para entregar: escanea el QR de reclamo (de residente o no registrado), digita el código o usa la búsqueda por nombre.</p>
+  <p class="hint">Para entregar: escanea el QR de reclamo que presente el residente o el no registrado (queda como evidencia verificada; ante disputa exonera al celador), digita el código corto (sin esa evidencia) o usa la búsqueda por nombre para no registrados.</p>
   {% else %}
   <p class="hint">No hay paquetes pendientes por entregar.</p>
   {% endif %}
@@ -115,7 +115,7 @@
     <tr>
       <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><small>{{ item.descripcion }}</small>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
       <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
-      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.metodo_entrega %} <span class="chip manual">{{ {"qr": "QR", "codigo": "código", "busqueda": "búsqueda"}[item.p.metodo_entrega] }}</span>{% endif %}{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.entrego }}{% if item.p.status == "disputa" and not item.p.resuelta_porteria %}<br><button class="small" data-resolver="{{ item.p.uuid }}">Resolver disputa</button>{% if item.p.resuelta_residente %}<br><small class="auto">El residente ya aceptó; falta portería</small>{% endif %}{% endif %}</td>
     </tr>

@@ -107,7 +107,7 @@
     <tr>
       <td>{% if item.p.short_code %}{{ item.p.short_code }}{% elif item.p.tercero %}{{ item.p.nombre_tercero }} <span class="chip manual">no registrado</span>{% endif %}{% if item.p.uuid in editados %} <span class="chip editada">editado</span>{% endif %}{% if item.descripcion %}<br><span class="observacion" title="{{ item.descripcion }}">{{ item.descripcion }}</span>{% endif %}{% if item.foto_disponible %}<br><a class="small" href="/api/packages/{{ item.p.uuid }}/foto" target="_blank" rel="noopener">Ver imagen</a>{% else %}<br><small>Imagen borrada (30 días tras entrega)</small>{% endif %}</td>
       <td>{{ item.destinatario }}{% if item.celular %} <small>{{ item.celular }}</small>{% endif %}{% if item.cedula %} · C.C. {{ item.cedula }}{% endif %}{% if item.destino %} · {{ item.destino }}{% endif %}</td>
-      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
+      <td><span class="chip status-{{ item.p.status }}">{{ item.p.status }}</span>{% if item.p.metodo_entrega %} <span class="chip manual">{{ {"qr": "QR", "codigo": "código", "busqueda": "búsqueda"}[item.p.metodo_entrega] }}</span>{% endif %}{% if item.p.status == "entregado" and item.dias_sin_confirmar is not none %} <small class="auto">hace {{ item.dias_sin_confirmar }} día{{ "" if item.dias_sin_confirmar == 1 else "s" }} sin confirmar (auto a 30)</small>{% endif %}{% if item.p.resuelta_at %} <small class="auto">disputa resuelta</small>{% endif %}</td>
       <td>{{ item.p.created_at|dt }}</td>
       <td>{{ item.p.delivered_at|dt }}</td>
       <td>{{ item.p.confirmed_at|dt }}</td>
@@ -117,7 +117,7 @@
     {% endfor %}
     </tbody>
   </table>
-  <p class="hint">Los paquetes de no registrados pueden asignarse a un residente aunque ya se hayan entregado: queda vinculado el registro con su dueño real.</p>
+  <p class="hint">Los paquetes de no registrados pueden asignarse a un residente aunque ya se hayan entregado: queda vinculado el registro con su dueño real. Filtra Estado = <a class="small" href="/admin/historial?tipo=paquetes&estado=entregado">entregado</a> para inspeccionar los que el residente aún no confirma (se autoconfirman a los 30 días; regla en <code>docs/paquetes-confirmacion.md</code>).</p>
   {% else %}
   <p class="hint">Sin paquetes que coincidan con el filtro.</p>
   {% endif %}

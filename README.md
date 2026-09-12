@@ -30,9 +30,10 @@ Probablemente la función de mayor utilidad de VIE en el día a día: recepción
 
 1. Llega un paquete → el **guarda** lo registra con una **foto** (comprimida en el navegador) y lo asigna al residente. Para encontrarlo busca por nombre o apellido; si va por destino, **torre y apartamento juntos**: `T4 1005`, `4 1005`, `4-1005` o `T4.1005` — torre sola o apto solo no arroja resultados (serían demasiados).
 2. El residente ve el aviso en su app: foto, descripción, código corto y **QR para reclamarlo**.
-3. En portería el residente muestra el QR → el guarda **ve la foto** → busca el paquete → **"Marcar entregado"**.
+3. En portería el residente muestra el QR → el guarda **ve la foto** → busca el paquete → **"Marcar entregado"**. Si la entrega se hizo **escaneando el reclamo firmado**, queda registrada como **verificada por QR** (metodo_entrega): ante una disputa exonera al celador, y el guarda no puede generar ese QR (solo el residente y administración lo emiten — [docs/entrega-qr.md](docs/entrega-qr.md)).
 4. El residente **confirma la recepción** (o marca "No lo recibí" → queda en disputa para administración).
-5. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
+5. Si no confirma en **30 días**, el paquete se **autoconfirma**; su app le muestra un **recordatorio en tiempo real** con los días que le quedan (cerrable, regla completa en [docs/paquetes-confirmacion.md](docs/paquetes-confirmacion.md)); administración inspecciona los pendientes desde el dashboard e historial.
+6. Las fotos de paquetes entregados se **borran solas 30 días después** de la entrega; las de paquetes pendientes se conservan hasta entregarse. Los registros completos quedan en el historial y en el Excel.
 
 ### Paquetes para alguien NO registrado
 

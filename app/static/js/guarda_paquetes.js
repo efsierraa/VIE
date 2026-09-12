@@ -147,23 +147,26 @@ document.getElementById("pkg-form").addEventListener("submit", async e => {
   }
 });
 
-document.getElementById("pkg-scan-form").addEventListener("submit", async e => {
+document.getElementById("pkg-scan-form").addEventListener("submit", e => {
   e.preventDefault();
-  const code = document.getElementById("pkg-code").value.trim().toUpperCase();
+  const raw = document.getElementById("pkg-code").value.trim();
+  // corto (≤8 caracteres, sin puntos) se manda como código; el resto, como QR firmado
+  const esCorto = raw.length <= 8 && !raw.includes(".");
+  buscarPaquete(esCorto ? {code: raw.toUpperCase()} : {token: raw});
   document.getElementById("pkg-code").value = "";
-  buscarPaquete(code);
 });
 
 function buscarPaquete(payload) {
   const box = document.getElementById("pkg-entrega");
+  const token = payload.token || null;  // el reclamo firmado viaja a la entrega como evidencia
   fetch("/api/packages/scan", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)})
     .then(r => r.json())
     .then(j => {
       if (!j.ok) { box.innerHTML = '<p class="alert error">' + esc(j.detail || "Error") + '</p>'; return; }
       if (j.package.tercero) {
-        renderTercero(j.package, box);  // reclamo con cédula: la foto ayuda a cotejar
+        renderTercero(j.package, box, token);  // reclamo con cédula: la foto ayuda a cotejar
       } else {
-        renderPaquete(j, box);
+        renderPaquete(j, box, token);
       }
     })
     .catch(() => { box.innerHTML = '<p class="alert error">Error de conexión</p>'; });
@@ -255,7 +258,8 @@ document.querySelectorAll("[data-resolver]").forEach(btn => btn.addEventListener
   const r = await fetch("/api/packages/" + btn.dataset.resolver + "/resolver", {method: "POST"});
   const j = await r.json();
   if (r.ok && j.ok) {
-    alert(j.resuelta ? "Disputa resuelta: el paquete quedó confirmado." : "Tu acuerdo quedó registrado; falta que el residente confirme.");
+    const nota = j.resuelta && j.exonera ? " Entrega verificada por QR: el celador queda exonerado." : "";
+    alert((j.resuelta ? "Disputa resuelta: el paquete quedó confirmado." : "Tu acuerdo quedó registrado; falta que el residente confirme.") + nota);
     location.reload();
   } else {
     alert(j.detail || "Error resolviendo la disputa");

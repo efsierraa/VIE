@@ -120,6 +120,9 @@ def _ensure_schema():
     if "tercero_celular" not in pkg_cols:
         with engine.begin() as conn:
             conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN tercero_celular VARCHAR(20)")
+    if "metodo_entrega" not in pkg_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE packages ADD COLUMN metodo_entrega VARCHAR(20)")
     usr_cols = {c["name"] for c in insp.get_columns("users")}
     if "celular" not in usr_cols:
         with engine.begin() as conn:
@@ -178,6 +181,7 @@ async def lifespan(app: FastAPI):
         api.auto_finalizar_visitas(db)  # salida automática de visitas cuyo QR ya expiró
         api.asignar_codigos_faltantes(db)  # paquetes viejos sin código (tercero pre-QR)
         api.purgar_visitas_antiguas(db)  # SOC2/CC + habeas data: retención 12 meses
+        api.autoconfirmar_paquetes(db)  # regla de 30 días: entregados sin confirmar
     yield
 
 

@@ -21,6 +21,7 @@ from app.auth import hash_password, require_api, verify_password
 from app.database import get_db
 from app.limitador import registrar_intento, verificar_limite
 from app.models import (
+    DIAS_AUTOCONFIRMACION,
     DIAS_FOTO_ENTREGADA,
     HORAS_VISITA_MANUAL,
     MINUTOS_GRACIA_EDICION,
@@ -1202,6 +1203,7 @@ def package_dict(p: Package, include_photo: bool = False, include_cedula: bool =
         "resuelta_porteria": p.resuelta_porteria,
         "resuelta_residente": p.resuelta_residente,
         "resuelta_at": p.resuelta_at.isoformat() if p.resuelta_at else None,
+        "metodo_entrega": p.metodo_entrega,
         "photo_delete_after": p.photo_delete_after.isoformat() if p.photo_delete_after else None,
     }
     if include_photo and p.photo:
@@ -1291,6 +1293,55 @@ def purgar_visitas_antiguas(db: Session, meses: int | None = None) -> int:
         db.commit()
         log.info("retencion_visitas_purgadas=%s meses=%s corte=%s", n, meses, corte.isoformat())
     return n
+
+
+def autoconfirmar_paquetes(db: Session) -> int:
+    """Regla de autoconfirmación: un paquete 'entregado' que el residente no
+    confirma en DIAS_AUTOCONFIRMACION días se confirma solo (confirmed_at = ahora).
+
+    Solo toca entregados: disputa, en_porteria y cancelado no participan.
+    Corre al arrancar y justo antes del weeksletter de los lunes.
+    """
+    corte = utcnow() - timedelta(days=DIAS_AUTOCONFIRMACION)
+    vencidos = (
+        db.query(Package)
+        .filter(Package.status == "entregado", Package.delivered_at.isnot(None), Package.delivered_at <= corte)
+        .all()
+    )
+    for p in vencidos:
+        p.status = "confirmado"
+        p.confirmed_at = utcnow()
+    if vencidos:
+        db.commit()
+        log.info("paquetes_autoconfirmados=%s dias=%s", len(vencidos), DIAS_AUTOCONFIRMACION)
+    return len(vencidos)
+
+
+def texto_recordatorio_paquetes(db: Session, resident_id: int) -> str | None:
+    """Recordatorio en tiempo real para el residente: se calcula al cargar su
+    página con lo que hay hoy en la BD (sin tabla de avisos ni horarios).
+
+    Devuelve None si no tiene entregados sin confirmar; si tiene, el texto
+    indica cuántos son y cuántos días quedan para la autoconfirmación.
+    """
+    entregados = (
+        db.query(Package)
+        .filter(Package.resident_id == resident_id, Package.status == "entregado", Package.delivered_at.isnot(None))
+        .all()
+    )
+    if not entregados:
+        return None
+    n = len(entregados)
+    dias_transcurridos = max((utcnow() - min(p.delivered_at for p in entregados)).days, 0)
+    dias_restantes = max(DIAS_AUTOCONFIRMACION - dias_transcurridos, 0)
+    plural = "" if n == 1 else "s"
+    dia = "" if dias_restantes == 1 else "s"
+    verbo = "queda" if dias_restantes == 1 else "quedan"
+    return (
+        f"Tienes {n} paquete{plural} entregado{plural} sin confirmar. "
+        f"{verbo.capitalize()} {dias_restantes} día{dia} para confirmar la recepción; "
+        "pasado el plazo se confirma automáticamente."
+    )
 
 
 @router.post("/admin/retencion/ejecutar")
@@ -1700,6 +1751,7 @@ class AsignarIn(BaseModel):
 
 class EntregarIn(BaseModel):
     cedula: str | None = None  # para terceros: cédula de quien reclama (evidencia)
+    token: str | None = None  # reclamo firmado escaneado en portería: valida metodo="qr"
 
 
 @router.post("/packages/{package_uuid}/asignar")
@@ -1751,11 +1803,19 @@ def entregar_paquete(
     guard: User = Depends(require_api("guarda")),
     db: Session = Depends(get_db),
 ):
+    """Entrega con evidencia: si llega el reclamo firmado (token) y pasa la
+    verificación, la entrega queda como "qr" (el residente presentó su QR en
+    portería; ante disputa exonerará al celador). Sin token queda como
+    "codigo" o "busqueda". Un token alterado invalida la entrega."""
     pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
     if pkg is None:
         raise HTTPException(404, "Paquete no encontrado")
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
+    token = (data.token or "").strip() if data else ""
+    if token and verify_package_token(token) != pkg.uuid:
+        raise HTTPException(400, "QR de paquete inválido o alterado: no se puede entregar")
+    metodo = "qr" if token else ("busqueda" if pkg.tercero else "codigo")
     if pkg.tercero:
         # la cédula de quien reclama queda como evidencia; se coteja el nombre con la etiqueta
         cedula = (data.cedula or "").strip() if data else ""
@@ -1767,9 +1827,10 @@ def entregar_paquete(
     pkg.status = "entregado"
     pkg.delivered_at = utcnow()
     pkg.delivered_by = guard.id
+    pkg.metodo_entrega = metodo
     pkg.photo_delete_after = utcnow() + timedelta(days=DIAS_FOTO_ENTREGADA)
     db.commit()
-    log.info("paquete_entregado codigo=%s por=%s", pkg.short_code or pkg.nombre_tercero, guard.username)
+    log.info("paquete_entregado codigo=%s por=%s metodo=%s", pkg.short_code or pkg.nombre_tercero, guard.username, metodo)
     return {"ok": True, "package": package_dict(pkg)}
 
 
@@ -1823,13 +1884,18 @@ def paquete_pass(
     user: User = Depends(require_api("residente", "guarda", "admin")),
     db: Session = Depends(get_db),
 ):
-    """QR de reclamo del paquete. El residente ve el suyo; el guarda y administración
-    pueden re-mostrar el de cualquier paquete en portería (p. ej. perdido el WhatsApp)."""
+    """QR de reclamo del paquete. El residente ve el suyo; administración puede
+    re-mostrarlo (p. ej. perdido el WhatsApp). El guarda solo el de no
+    registrados, que es quien debe reenviarles el QR de reclamo: el QR de un
+    paquete de residente es su evidencia de entrega y no lo puede generar
+    quien lo entrega."""
     pkg = db.query(Package).filter(Package.uuid == package_uuid).first()
     if pkg is None:
         raise HTTPException(404, "Paquete no encontrado")
     if user.role == "residente" and pkg.resident_id != user.id:
         raise HTTPException(404, "Paquete no encontrado")
+    if user.role == "guarda" and not pkg.tercero:
+        raise HTTPException(403, "El QR de un paquete de residente solo lo emite el residente o administración")
     if pkg.status != "en_porteria":
         raise HTTPException(400, "Este paquete ya fue entregado o cancelado")
     token = sign_package(pkg.uuid)
@@ -1907,15 +1973,19 @@ def resolver_disputa(
         pkg.resuelta_porteria = True
         lado = "portería"
 
-    _registrar_edicion(db, "paquete", pkg.uuid, user, [f"disputa: aceptada por {lado} ({user.username})"])
+    cambios = [f"disputa: aceptada por {lado} ({user.username})"]
+    if pkg.metodo_entrega == "qr":
+        # la entrega se hizo con el reclamo firmado del residente: el celador queda exonerado
+        cambios.append("entrega verificada por QR (responsabilidad del residente)")
+    _registrar_edicion(db, "paquete", pkg.uuid, user, cambios)
     ambos = pkg.resuelta_porteria and pkg.resuelta_residente
     if ambos:
         pkg.status = "confirmado"
         pkg.confirmed_at = utcnow()
         pkg.resuelta_at = utcnow()
-        log.info("disputa_resuelta uuid=%s por=%s", pkg.uuid, user.username)
+        log.info("disputa_resuelta uuid=%s por=%s metodo=%s", pkg.uuid, user.username, pkg.metodo_entrega)
     db.commit()
-    return {"ok": True, "resuelta": ambos, "package": package_dict(pkg)}
+    return {"ok": True, "resuelta": ambos, "exonera": pkg.metodo_entrega == "qr", "package": package_dict(pkg)}
 
 
 @router.post("/users/{user_id}/toggle")
