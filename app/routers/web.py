@@ -178,13 +178,13 @@ def etiquetas_piscina(db: Session, filas: list) -> dict:
     def _destino(f) -> str:
         return f"T{f.tower} · {f.apartment}" if f.tower and f.apartment else "—"
 
-    ninos_por_adulto: dict[int, list[tuple[int, str]]] = {}
+    ninos_por_adulto: dict[int, list[str]] = {}
     # misma fila puede llegar repetida (activos + hoy la incluyen); sin dedupe
     # un niño abierto contaba doble en "Salir con N"
     unicas = {f.id: f for f in filas}
     for f in unicas.values():
         if f.persona_tipo == "nino" and f.acompanante_acceso_id and f.exit_at is None:
-            ninos_por_adulto.setdefault(f.acompanante_acceso_id, []).append((f.id, f.menor_nombre or "niño"))
+            ninos_por_adulto.setdefault(f.acompanante_acceso_id, []).append(f.menor_nombre or "niño")
 
     etiquetas = {}
     for f in unicas.values():
@@ -207,8 +207,7 @@ def etiquetas_piscina(db: Session, filas: list) -> dict:
                 "persona": f.invitado_nombre or "invitado",
                 "vinculo": f"invitado de {padrino.nombre_completo}" if padrino else "",
                 "destino": _destino(f),
-                "ninos": [n for _, n in ninos_por_adulto.get(f.id, [])],
-                "ninos_detalle": ", ".join(f"{n} (fila {fid})" for fid, n in ninos_por_adulto.get(f.id, [])),
+                "ninos": ninos_por_adulto.get(f.id, []),
                 "registra": registra,
             }
         else:
@@ -216,8 +215,7 @@ def etiquetas_piscina(db: Session, filas: list) -> dict:
                 "persona": _persona_nombre(usuarios, f),
                 "vinculo": "",
                 "destino": _destino(f),
-                "ninos": [n for _, n in ninos_por_adulto.get(f.id, [])],
-                "ninos_detalle": ", ".join(f"{n} (fila {fid})" for fid, n in ninos_por_adulto.get(f.id, [])),
+                "ninos": ninos_por_adulto.get(f.id, []),
                 "registra": registra,
             }
     return etiquetas
