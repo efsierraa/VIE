@@ -51,6 +51,21 @@ def _relajar_full_name_legado(eng) -> bool:
     return True
 
 
+def _hay_indice_pool(conn) -> bool:
+    """Verificación cruda del índice anti-duplicados de piscina (por dialecto)."""
+    if engine.dialect.name == "postgresql":
+        return (
+            conn.exec_driver_sql("SELECT 1 FROM pg_indexes WHERE indexname = 'uq_pool_nino_abierto'").first()
+            is not None
+        )
+    return (
+        conn.exec_driver_sql(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'uq_pool_nino_abierto'"
+        ).first()
+        is not None
+    )
+
+
 def _ensure_schema():
     """Crea tablas y columnas nuevas sin borrar datos existentes."""
     Base.metadata.create_all(engine)
@@ -133,6 +148,30 @@ def _ensure_schema():
                 else:
                     conn.exec_driver_sql(f"ALTER TABLE packages ADD COLUMN {col} BOOLEAN DEFAULT {falso} NOT NULL")
 
+    # Piscina: un niño abierto no puede estar duplicado con el mismo acompañante
+    # (reintentos/doble toque crearon filas gemelas y contaban doble en las salidas).
+    # En cada arranque se cierran los gemelos históricos (queda el más viejo) y se
+    # asegura el índice único parcial, que bloquea duplicados a nivel de BD aunque
+    # dos peticiones compitan. La verificación del índice va por SQL crudo porque el
+    # reflejo del inspector no lo ve de forma fiable en todos los dialectos.
+    with engine.begin() as conn:
+        limpiados = conn.exec_driver_sql(
+            "DELETE FROM pool_access WHERE persona_tipo = 'nino' AND exit_at IS NULL AND id NOT IN ("
+            "SELECT MIN(id) FROM pool_access WHERE persona_tipo = 'nino' AND exit_at IS NULL "
+            "GROUP BY acompanante_acceso_id, lower(menor_nombre))"
+        ).rowcount
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_pool_nino_abierto ON pool_access "
+            "(acompanante_acceso_id, lower(menor_nombre)) "
+            "WHERE persona_tipo = 'nino' AND exit_at IS NULL"
+        )
+        _vie_log.info(
+            "pool_dedup dialeto=%s gemelos_cerrados=%s indice_nino=%s",
+            engine.dialect.name,
+            limpiados,
+            _hay_indice_pool(conn),
+        )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -146,8 +185,20 @@ async def lifespan(app: FastAPI):
     yield
 
 
+class EstaticosConCache(StaticFiles):
+    """Sirve /static con Cache-Control explícito. Sin esta cabecera los navegadores
+    aplican caché heurístico (10% de la antigüedad del Last-Modified) y un celular
+    puede quedar horas con un JS viejo. Con URLs versionadas (?v=hash) el caché de
+    un día es seguro: contenido nuevo ⇒ URL nueva ⇒ descarga inmediata."""
+
+    def file_response(self, *args, **kwargs):
+        respuesta = super().file_response(*args, **kwargs)
+        respuesta.headers["Cache-Control"] = "public, max-age=86400"
+        return respuesta
+
+
 app = FastAPI(title="VIE — Vigilancia de Ingresos y Egresos", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", EstaticosConCache(directory="app/static"), name="static")
 app.include_router(web.router)
 app.include_router(api.router)
 
@@ -163,21 +214,26 @@ async def request_id(request: Request, call_next):
 
 @app.get("/health")
 def health() -> JSONResponse:
-    """Salud pública para Render/uptime: app + base de datos."""
+    """Salud pública para Render/uptime: app + base de datos + commit en vivo."""
+    version = os.environ.get("RENDER_GIT_COMMIT", "")[:10]
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return JSONResponse({"ok": True, "db": "up"})
+        return JSONResponse({"ok": True, "db": "up", "version": version})
     except Exception:
         _vie_log.warning("health_db_down")
-        return JSONResponse({"ok": False, "db": "down"}, status_code=503)
+        return JSONResponse({"ok": False, "db": "down", "version": version}, status_code=503)
 
 
 @app.middleware("http")
 async def cabeceras_seguridad(request: Request, call_next):
-    """Cabeceras básicas de seguridad en todas las respuestas."""
+    """Cabeceras básicas de seguridad en todas las respuestas. Las páginas HTML
+    nunca se guardan en caché: un HTML viejo del navegador mostraba conteos y
+    botones de un estado pasado (el 'con 2' fantasma tras un exito)."""
     respuesta = await call_next(request)
     h = respuesta.headers
+    if respuesta.headers.get("content-type", "").startswith("text/html"):
+        h["Cache-Control"] = "no-store"
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
     h.setdefault("Referrer-Policy", "same-origin")

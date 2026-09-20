@@ -1,14 +1,16 @@
 import base64
+import hashlib
 import io
 import logging
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlencode
 
 import openpyxl
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_
+from sqlalchemy import and_, false, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -33,10 +35,11 @@ from app.models import (
     VISIT_STATUS,
     EditLog,
     Package,
+    PoolAccess,
     Visit,
     User,
 )
-from app.routers.api import qr_data_uri, texto_recordatorio_paquetes
+from app.routers.api import parse_torre_apto, qr_data_uri, texto_recordatorio_paquetes
 from app.security import sign_package
 from app.utils import BOGOTA, format_duration, utcnow
 
@@ -44,13 +47,42 @@ log = logging.getLogger("vie")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente"}
+HOME = {"admin": "/admin", "guarda": "/guarda/paquetes", "residente": "/residente", "piscina": "/piscina"}
 templates.env.globals["HOME"] = HOME  # el chip del usuario enlaza al inicio de su rol
+
+TIPO_LABEL = {"adulto": "Adulto", "nino": "Niño", "invitado": "Invitado"}  # el valor guardado es ASCII, la vista con ñ
+templates.env.globals["TIPO_LABEL"] = TIPO_LABEL
+
+_hash_estaticos: dict[str, tuple[float, str]] = {}
+
+
+def estatico(path: str) -> str:
+    """URL de un archivo estático con la versión impuesta por su contenido (?v=hash).
+    Al cambiar el archivo cambia la URL: ningún navegador sirve una versión vieja
+    de JS/CSS (sin esto, el caché heurístico del celular quedó días atrás y mostró
+    HTML nuevo con JS viejo)."""
+    rel = path.removeprefix("/static/")
+    archivo = Path("app/static") / rel
+    try:
+        mtime = archivo.stat().st_mtime
+    except OSError:
+        return path
+    cacheado = _hash_estaticos.get(path)
+    if cacheado is None or cacheado[0] != mtime:
+        cacheado = (mtime, hashlib.sha1(archivo.read_bytes()).hexdigest()[:10])
+        _hash_estaticos[path] = cacheado
+    return f"{path}?v={cacheado[1]}"
+
+
+templates.env.globals["estatico"] = estatico
 
 NAVEGACION = {
     "guarda": [
         ("paquetes", "/guarda/paquetes", "Paquetes"),
         ("ingresos", "/guarda", "Ingresos"),
+    ],
+    "piscina": [
+        ("piscina", "/piscina", "Piscina"),
     ],
     "admin": [
         ("inicio", "/admin", "Inicio"),
@@ -119,6 +151,79 @@ def editados_en(db: Session, uuids: set) -> set:
     if not uuids:
         return set()
     return {row[0] for row in db.query(EditLog.entity_uuid).filter(EditLog.entity_uuid.in_(uuids)).all()}
+
+
+def etiquetas_piscina(db: Session, filas: list) -> dict:
+    """Etiquetas legibles para las filas de piscina: persona, vínculo y destino."""
+    ids = {f.resident_id for f in filas if f.resident_id}
+    ids |= {f.entry_guard_id for f in filas if f.entry_guard_id}
+    ids |= {f.exit_guard_id for f in filas if f.exit_guard_id}
+    usuarios = {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()} if ids else {}
+    acomp_ids = {f.acompanante_acceso_id for f in filas if f.persona_tipo == "nino" and f.acompanante_acceso_id}
+    acomp_filas = (
+        {a.id: a for a in db.query(PoolAccess).filter(PoolAccess.id.in_(acomp_ids)).all()}
+        if acomp_ids
+        else {}
+    )
+
+    def _nombre_fila(a) -> str:
+        if a is None:
+            return ""
+        if a.persona_tipo == "nino":
+            return a.menor_nombre or "niño"
+        if a.persona_tipo == "invitado":
+            return a.invitado_nombre or "invitado"
+        return _persona_nombre(usuarios, a)
+
+    def _destino(f) -> str:
+        return f"T{f.tower} · {f.apartment}" if f.tower and f.apartment else "—"
+
+    ninos_por_adulto: dict[int, list[str]] = {}
+    # misma fila puede llegar repetida (activos + hoy la incluyen); sin dedupe
+    # un niño abierto contaba doble en "Salir con N"
+    unicas = {f.id: f for f in filas}
+    for f in unicas.values():
+        if f.persona_tipo == "nino" and f.acompanante_acceso_id and f.exit_at is None:
+            ninos_por_adulto.setdefault(f.acompanante_acceso_id, []).append(f.menor_nombre or "niño")
+
+    etiquetas = {}
+    for f in unicas.values():
+        registra = ""
+        if f.entry_guard_id and f.entry_guard_id in usuarios:
+            registra = usuarios[f.entry_guard_id].nombre_completo
+        if f.persona_tipo == "nino":
+            nombre = f.menor_nombre or "niño"
+            acomp = _nombre_fila(acomp_filas.get(f.acompanante_acceso_id))
+            etiquetas[f.id] = {
+                "persona": nombre,
+                "vinculo": f"con {acomp}" if acomp else "",
+                "destino": _destino(f),
+                "ninos": [],
+                "registra": registra,
+            }
+        elif f.persona_tipo == "invitado":
+            padrino = usuarios.get(f.resident_id)
+            etiquetas[f.id] = {
+                "persona": f.invitado_nombre or "invitado",
+                "vinculo": f"invitado de {padrino.nombre_completo}" if padrino else "",
+                "destino": _destino(f),
+                "ninos": ninos_por_adulto.get(f.id, []),
+                "registra": registra,
+            }
+        else:
+            etiquetas[f.id] = {
+                "persona": _persona_nombre(usuarios, f),
+                "vinculo": "",
+                "destino": _destino(f),
+                "ninos": ninos_por_adulto.get(f.id, []),
+                "registra": registra,
+            }
+    return etiquetas
+
+
+def _persona_nombre(usuarios: dict, f) -> str:
+    residente = usuarios.get(f.resident_id) if f else None
+    return residente.nombre_completo if residente else "—"
 
 
 def name_map(db: Session, visits: list[Visit]) -> dict[int, str]:
@@ -533,6 +638,72 @@ def guarda_paquetes_page(
     )
 
 
+# --- Piscina -----------------------------------------------------------------
+
+
+@router.get("/piscina", response_class=HTMLResponse)
+def piscina_page(
+    request: Request,
+    user: User = Depends(require_page("piscina")),
+    pagina_a: str = "1",
+    pagina_h: str = "1",
+    q: str = "",
+    db: Session = Depends(get_db),
+):
+    abiertos = db.query(PoolAccess).filter(PoolAccess.exit_at.is_(None))
+    if q.strip():
+        texto = q.strip()
+        condiciones = []
+        destino = parse_torre_apto(texto)
+        if destino:
+            torre, apto = destino
+            condiciones.append(and_(PoolAccess.tower == torre, PoolAccess.apartment.ilike(apto)))
+        for token in [t for t in texto.split() if not t.isdigit()]:
+            like = f"%{token}%"
+            por_nombre = or_(PoolAccess.menor_nombre.ilike(like), PoolAccess.invitado_nombre.ilike(like))
+            rids = [
+                u.id
+                for u in db.query(User.id)
+                .filter(
+                    User.role == "residente",
+                    or_(User.nombres.ilike(like), User.apellidos.ilike(like), User.username.ilike(like)),
+                )
+                .all()
+            ]
+            condiciones.append(or_(por_nombre, PoolAccess.resident_id.in_(rids)) if rids else por_nombre)
+        if condiciones:
+            abiertos = abiertos.filter(or_(*condiciones))
+        else:
+            abiertos = abiertos.filter(false())  # número sin su par (torre o apto solo): sin resultados
+    activos, a_ant, a_sig = paginar(abiertos.order_by(PoolAccess.entry_at.desc()), _pagina(pagina_a), 25)
+
+    today_local = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
+    start_utc, _ = day_window_utc(today_local)
+    hoy, h_ant, h_sig = paginar(
+        db.query(PoolAccess)
+        .filter(PoolAccess.entry_at >= start_utc)
+        .order_by(PoolAccess.entry_at.desc()),
+        _pagina(pagina_h),
+        50,
+    )
+
+    etiquetas = etiquetas_piscina(db, list(activos) + list(hoy))
+    return templates.TemplateResponse(
+        request,
+        "piscina.html",
+        {
+            "user": user,
+            "activos": activos,
+            "hoy": hoy,
+            "etiquetas": etiquetas,
+            "f_q": q,
+            "pager_a": pager(_pagina(pagina_a), a_ant, a_sig, "/piscina", {"q": q}, "pagina_a"),
+            "pager_h": pager(_pagina(pagina_h), h_ant, h_sig, "/piscina", {}, "pagina_h"),
+            "tabs": nav_de("piscina", "piscina"),
+        },
+    )
+
+
 # --- Admin · Inicio (dashboard) ----------------------------------------------
 
 
@@ -552,6 +723,7 @@ def admin_page(
         "sin_residente": db.query(Package).filter(Package.tercero.is_(True), Package.status == "en_porteria").count(),
         "sin_confirmar": db.query(Package).filter(Package.status == "entregado").count(),
         "activos": db.query(User).filter(User.active.is_(True)).count(),
+        "piscina": db.query(PoolAccess).filter(PoolAccess.exit_at.is_(None)).count(),
     }
     return templates.TemplateResponse(
         request,
@@ -640,12 +812,14 @@ def admin_historial_page(
     pagina_v: str = "1",
     pagina_p: str = "1",
     pagina_ed: str = "1",
+    pagina_s: str = "1",
     db: Session = Depends(get_db),
 ):
-    if tipo not in ("ingresos", "paquetes", "ambos"):
+    if tipo not in ("ingresos", "paquetes", "ambos", "piscina"):
         tipo = "ambos"
     ver_ingresos = tipo in ("ingresos", "ambos")
     ver_paquetes = tipo in ("paquetes", "ambos")
+    ver_piscina = tipo == "piscina"
 
     # un estado pertenece a un solo dominio: si se filtra por él, el otro dominio no aplica
     if estado:
@@ -711,6 +885,39 @@ def admin_historial_page(
     uids = {v.uuid for v in visits} | {i["p"].uuid for i in paquetes_hist}
     editados = editados_en(db, uids)
 
+    filas_piscina = []
+    pager_piscina = pager(1, False, False, "/admin/historial", {}, "pagina_s")
+    if ver_piscina:
+        query = db.query(PoolAccess).order_by(PoolAccess.id.desc())
+        if fecha_dia:
+            start_utc, end_utc = day_window_utc(fecha_dia)
+            query = query.filter(PoolAccess.entry_at >= start_utc, PoolAccess.entry_at <= end_utc)
+        if torre.strip():
+            query = query.filter(PoolAccess.tower == torre.strip().upper())
+        if apto.strip():
+            query = query.filter(PoolAccess.apartment == apto.strip())
+        if q.strip():
+            for token in q.strip().split():
+                like = f"%{token}%"
+                rids = [
+                    u.id
+                    for u in db.query(User)
+                    .filter(
+                        User.role == "residente",
+                        or_(User.nombres.ilike(like), User.apellidos.ilike(like), User.username.ilike(like)),
+                    )
+                    .all()
+                ]
+                conds = [PoolAccess.menor_nombre.ilike(like), PoolAccess.invitado_nombre.ilike(like)]
+                if rids:
+                    conds.append(PoolAccess.resident_id.in_(rids))
+                query = query.filter(or_(*conds))
+        filas_piscina, s_ant, s_sig = paginar(query, _pagina(pagina_s), 50)
+        pager_piscina = pager(
+            _pagina(pagina_s), s_ant, s_sig, "/admin/historial",
+            {"tipo": tipo, "fecha": fecha, "estado": estado, "q": q, "torre": torre, "apto": apto}, "pagina_s",
+        )
+
     # Control de ediciones: qué cambió, quién y cuándo
     logs, ed_ant, ed_sig = paginar(
         db.query(EditLog).order_by(EditLog.id.desc()),
@@ -761,6 +968,10 @@ def admin_historial_page(
             "paquetes_hist": paquetes_hist,
             "pager_ingresos": pager_ingresos,
             "pager_paquetes": pager_paquetes,
+            "ver_piscina": ver_piscina,
+            "filas_piscina": filas_piscina,
+            "etiquetas_piscina": etiquetas_piscina(db, filas_piscina) if filas_piscina else {},
+            "pager_piscina": pager_piscina,
             "editados": editados,
             "logs": logs,
             "labels": labels,
@@ -780,14 +991,16 @@ def exportar_visitas(
     user: User = Depends(require_page("admin")),
     ingresos: str = "",
     paquetes: str = "",
+    piscina: str = "",
     desde: str = "",
     hasta: str = "",
     db: Session = Depends(get_db),
 ):
     quiere_ingresos = ingresos == "1"
     quiere_paquetes = paquetes == "1"
-    if not (quiere_ingresos or quiere_paquetes):
-        raise HTTPException(400, "Elige al menos una opción: ingresos o paquetes")
+    quiere_piscina = piscina == "1"
+    if not (quiere_ingresos or quiere_paquetes or quiere_piscina):
+        raise HTTPException(400, "Elige al menos una opción: ingresos, paquetes o piscina")
 
     hoy = utcnow().replace(tzinfo=timezone.utc).astimezone(BOGOTA).date()
     try:
@@ -856,6 +1069,37 @@ def exportar_visitas(
         ids_pkg = {p.resident_id for p in pkgs} | {p.delivered_by for p in pkgs if p.delivered_by}
         usuarios_pkg = {u.id: u for u in db.query(User).filter(User.id.in_(ids_pkg)).all()} if ids_pkg else {}
         _hoja_paquetes(wb, pkgs, usuarios_pkg)
+
+    if quiere_piscina:
+        filas = (
+            db.query(PoolAccess)
+            .filter(PoolAccess.entry_at >= start_utc, PoolAccess.entry_at <= end_utc)
+            .order_by(PoolAccess.entry_at)
+            .all()
+        )
+        et = etiquetas_piscina(db, filas)
+        ids_reg = {f.entry_guard_id for f in filas if f.entry_guard_id}
+        guardias = {u.id: u.nombre_completo for u in db.query(User).filter(User.id.in_(ids_reg)).all()} if ids_reg else {}
+        ws = wb.create_sheet("Piscina")
+        ws.append(
+            ["Fecha", "Persona", "Tipo", "Vínculo", "Residencia", "Entrada", "Salida", "Duración", "Registró"]
+        )
+        for f in filas:
+            entrada = f.entry_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if f.entry_at else None
+            salida = f.exit_at.replace(tzinfo=timezone.utc).astimezone(BOGOTA) if f.exit_at else None
+            ws.append(
+                [
+                    entrada.strftime("%d/%m/%Y") if entrada else "",
+                    et.get(f.id, {}).get("persona", ""),
+                    TIPO_LABEL.get(f.persona_tipo, f.persona_tipo),
+                    et.get(f.id, {}).get("vinculo", ""),
+                    et.get(f.id, {}).get("destino", ""),
+                    entrada.strftime("%H:%M") if entrada else "",
+                    salida.strftime("%H:%M") if salida else "",
+                    format_duration(salida - entrada) if salida and entrada else "",
+                    guardias.get(f.entry_guard_id, ""),
+                ]
+            )
 
     buf = io.BytesIO()
     wb.save(buf)

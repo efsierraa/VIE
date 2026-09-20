@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, Response
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, require_api, verify_password
@@ -29,6 +30,7 @@ from app.models import (
     VISITOR_ROLES,
     EditLog,
     Package,
+    PoolAccess,
     User,
     Visit,
 )
@@ -366,6 +368,284 @@ def visit_pass(
 
 
 # --- Guarda ---------------------------------------------------------------
+
+
+class NinoIn(BaseModel):
+    nombres: str
+    apellidos: str
+    edad: int | None = None
+
+
+class InvitadoPiscinaIn(BaseModel):
+    nombres: str
+    apellidos: str
+    padrino_id: int
+    ninos: list[NinoIn] = []
+
+
+class IngresoAdultoIn(BaseModel):
+    resident_id: int
+
+
+class IngresoNinoIn(BaseModel):
+    acompanante_id: int
+    ninos: list[NinoIn]
+
+
+MAX_NINOS_PISCINA = 10
+
+
+def _nombre_completo(nombres: str, apellidos: str, quien: str) -> str:
+    """Nombres y apellidos por separado (como toda la app), unidos en el nombre
+    completo que se guarda y muestra. Ambos campos son obligatorios."""
+    nombres = (nombres or "").strip()
+    apellidos = (apellidos or "").strip()
+    if not nombres:
+        raise HTTPException(400, f"Los nombres {quien} son obligatorios")
+    if not apellidos:
+        raise HTTPException(400, f"Los apellidos {quien} son obligatorios")
+    if len(nombres) > 40 or len(apellidos) > 40:
+        raise HTTPException(400, f"Nombres o apellidos {quien} demasiado largos")
+    completo = f"{nombres} {apellidos}"
+    if len(completo) > 80:
+        raise HTTPException(400, f"El nombre completo {quien} es demasiado largo")
+    return completo
+
+
+def _validar_ninos(ninos: list[NinoIn]) -> list[tuple[str, int | None]]:
+    """Reglas compartidas por acompañante residente e invitado. Devuelve la lista
+    limpia (nombre completo, edad) lista para registrar."""
+    if len(ninos) > MAX_NINOS_PISCINA:
+        raise HTTPException(400, f"Máximo {MAX_NINOS_PISCINA} niños por registro")
+    limpios = []
+    for n in ninos:
+        if n.edad is not None and not 0 <= n.edad <= 17:
+            raise HTTPException(400, "La edad del niño debe estar entre 0 y 17")
+        limpios.append((_nombre_completo(n.nombres, n.apellidos, "del niño"), n.edad))
+    return limpios
+
+
+def _residente_piscina(db: Session, resident_id: int) -> User:
+    """Un residente activo con torre y apartamento: el único que entra a la piscina.
+    El candado FOR UPDATE serializa ingresos concurrentes del mismo residente (doble
+    toque en el botón): el segundo espera, y al continuar ya ve los niños del primero."""
+    residente = db.get(User, resident_id, with_for_update=True)
+    if residente is None or residente.role != "residente" or not residente.active:
+        raise HTTPException(404, "Residente no encontrado")
+    if not residente.tower or not residente.apartment:
+        raise HTTPException(400, "El residente no tiene torre/apartamento registrado")
+    return residente
+
+
+def _abierta_adulto(db: Session, resident_id: int):
+    """Fila 'dentro' del adulto residente (para no duplicar ni perder el vínculo).
+    Solo filas adulto: el invitado del residente no es el residente dentro."""
+    return (
+        db.query(PoolAccess)
+        .filter(
+            PoolAccess.resident_id == resident_id,
+            PoolAccess.persona_tipo == "adulto",
+            PoolAccess.exit_at.is_(None),
+        )
+        .first()
+    )
+
+
+def _fila_adulto(db: Session, residente: User, guard: User) -> PoolAccess:
+    """Reutiliza la entrada abierta del adulto o la crea (una sola acción, sin duplicados)."""
+    fila = _abierta_adulto(db, residente.id)
+    if fila is None:
+        fila = PoolAccess(
+            persona_tipo="adulto",
+            resident_id=residente.id,
+            tower=residente.tower,
+            apartment=residente.apartment,
+            entry_guard_id=guard.id,
+        )
+        db.add(fila)
+        db.flush()
+    return fila
+
+
+@router.post("/piscina/ingreso")
+def ingreso_piscina_adulto(
+    data: IngresoAdultoIn,
+    guard: User = Depends(require_api("piscina", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Entrada de un adulto residente a la piscina."""
+    residente = _residente_piscina(db, data.resident_id)
+    if _abierta_adulto(db, residente.id):
+        raise HTTPException(400, f"{residente.nombre_completo} ya está en la piscina")
+    fila = _fila_adulto(db, residente, guard)
+    db.commit()
+    log.info("piscina_ingreso adulto=%s por=%s", residente.username, guard.username)
+    return {"ok": True, "message": f"{residente.nombre_completo} entró a la piscina"}
+
+
+@router.post("/piscina/ingreso-nino")
+def ingreso_piscina_nino(
+    data: IngresoNinoIn,
+    guard: User = Depends(require_api("piscina", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Entrada de niño(s) con su acompañante residente: una sola acción registra
+    al adulto y a los niños vinculados. El niño ni entra ni sale solo."""
+    acompanante = _residente_piscina(db, data.acompanante_id)
+    limpios = _validar_ninos(data.ninos)
+    if not limpios:
+        raise HTTPException(400, "Registra al menos un niño con su acompañante")
+
+    fila_adulto = _fila_adulto(db, acompanante, guard)
+    dentro = {
+        n.lower()
+        for (n,) in db.query(PoolAccess.menor_nombre)
+        .filter(PoolAccess.acompanante_acceso_id == fila_adulto.id, PoolAccess.exit_at.is_(None))
+        .all()
+        if n
+    }
+    creados, repetidos, vistos = [], [], set()
+    for nombre, edad in limpios:
+        clave = nombre.lower()
+        if clave in dentro or clave in vistos:
+            repetidos.append(nombre)
+            continue
+        vistos.add(clave)
+        fila = PoolAccess(
+            persona_tipo="nino",
+            resident_id=acompanante.id,
+            acompanante_acceso_id=fila_adulto.id,
+            menor_nombre=nombre,
+            menor_edad=edad,
+            tower=acompanante.tower,
+            apartment=acompanante.apartment,
+            entry_guard_id=guard.id,
+        )
+        db.add(fila)
+        creados.append(nombre)
+    if not creados:
+        db.rollback()
+        raise HTTPException(400, f"Ya están en la piscina con su acompañante: {', '.join(repetidos)}")
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "Ese niño ya está registrado dentro de la piscina")
+    log.info("piscina_ingreso ninos=%s con=%s por=%s", ",".join(creados), acompanante.username, guard.username)
+    message = f"{', '.join(creados)} entró a la piscina con {acompanante.nombre_completo}"
+    if repetidos:
+        message += f" (ya estaban dentro: {', '.join(repetidos)})"
+    return {"ok": True, "message": message}
+
+
+@router.post("/piscina/ingreso-invitado")
+def ingreso_piscina_invitado(
+    data: InvitadoPiscinaIn,
+    guard: User = Depends(require_api("piscina", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Entrada de un invitado adulto (con nombre) ligado a un residente padrino,
+    opcionalmente con sus niños (que quedan ligados a su fila)."""
+    padrino = _residente_piscina(db, data.padrino_id)
+    nombre = _nombre_completo(data.nombres, data.apellidos, "del invitado")
+    existente = (
+        db.query(PoolAccess)
+        .filter(
+            PoolAccess.persona_tipo == "invitado",
+            PoolAccess.exit_at.is_(None),
+            func.lower(PoolAccess.invitado_nombre) == nombre.lower(),
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(400, f"{nombre} ya está en la piscina")
+    limpios = _validar_ninos(data.ninos)
+
+    fila_inv = PoolAccess(
+        persona_tipo="invitado",
+        resident_id=padrino.id,
+        invitado_nombre=nombre,
+        tower=padrino.tower,
+        apartment=padrino.apartment,
+        entry_guard_id=guard.id,
+    )
+    db.add(fila_inv)
+    db.flush()
+    creados = [nombre]
+    vistos_inv = {nombre.lower()}
+    for nino_nombre, nino_edad in limpios:
+        clave = nino_nombre.lower()
+        if clave in vistos_inv:
+            continue
+        vistos_inv.add(clave)
+        db.add(
+            PoolAccess(
+                persona_tipo="nino",
+                resident_id=padrino.id,
+                acompanante_acceso_id=fila_inv.id,
+                menor_nombre=nino_nombre,
+                menor_edad=nino_edad,
+                tower=padrino.tower,
+                apartment=padrino.apartment,
+                entry_guard_id=guard.id,
+            )
+        )
+        creados.append(nino_nombre)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, f"{nombre} ya está en la piscina")
+    log.info("piscina_ingreso invitado=%s padrino=%s por=%s", nombre, padrino.username, guard.username)
+    return {
+        "ok": True,
+        "message": f"{nombre} entró a la piscina (invitado de {padrino.nombre_completo})",
+    }
+
+
+@router.post("/piscina/salida/{fila_id}")
+def salida_piscina(
+    fila_id: int,
+    guard: User = Depends(require_api("piscina", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Salida de la piscina. El niño nunca sale solo: la salida del acompañante
+    cierra al grupo (adulto + sus niños) en un solo registro."""
+    fila = db.get(PoolAccess, fila_id)
+    if fila is None or fila.exit_at is not None:
+        raise HTTPException(404, "Registro no encontrado o ya fuera de la piscina")
+
+    ahora = utcnow()
+    if fila.persona_tipo == "nino":
+        raise HTTPException(400, "Un menor solo sale con su acompañante: usa su salida en grupo")
+
+    grupo = [fila]
+    if fila.persona_tipo in ("adulto", "invitado"):
+        ninos = (
+            db.query(PoolAccess)
+            .filter(PoolAccess.acompanante_acceso_id == fila.id, PoolAccess.exit_at.is_(None))
+            .all()
+        )
+        grupo.extend(ninos)
+
+    nombres = []
+    for f in grupo:
+        f.exit_at = ahora
+        f.exit_guard_id = guard.id
+        nombres.append(_nombre_pool(db, f))
+    db.commit()
+    mensaje = f"Salió de la piscina: {', '.join(nombres)}" if len(nombres) > 1 else f"{nombres[0]} salió de la piscina"
+    log.info("piscina_salida grupo=%s por=%s", ",".join(nombres), guard.username)
+    return {"ok": True, "message": mensaje, "salidos": nombres}
+
+
+def _nombre_pool(db: Session, f: PoolAccess) -> str:
+    if f.persona_tipo == "nino":
+        return f.menor_nombre or "niño"
+    if f.persona_tipo == "invitado":
+        return f.invitado_nombre or "invitado"
+    residente = db.get(User, f.resident_id)
+    return residente.nombre_completo if residente else "residente"
 
 
 @router.post("/scan")
@@ -1102,24 +1382,37 @@ def foto_paquete(
 
 
 # Torre y apto juntos: "T4 1005", "4 1005", "4-1005", "t4.1005". El apto siempre lleva dígitos.
-TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-z0-9]*\d[A-Za-z0-9]*)$", re.IGNORECASE)
+# Patrón lineal a propósito: `([A-Za-z0-9]*\d[A-Za-z0-9]*)` es ambiguo y CodeQL lo marcó como
+# polinómico (ReDoS) sobre la búsqueda del usuario. El "apto con al menos un dígito" se
+# verifica con `any(...isdigit())` en `parse_torre_apto`.
+TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-z0-9]+)$", re.IGNORECASE)
+MAX_LARGO_BUSQUEDA = 60  # cota defensiva: ninguna búsqueda legítima de destino supera esto
+
+
+def parse_torre_apto(texto: str) -> tuple[str, str] | None:
+    """Devuelve (torre, apto) para un destino tipo T4 1005 / 4-1005 / T4.1005, o None."""
+    if not texto or len(texto) > MAX_LARGO_BUSQUEDA:
+        return None
+    m = TORRE_APTO_RE.match(texto)
+    if not m or not any(c.isdigit() for c in m.group(3)):
+        return None
+    return (m.group(1) or m.group(2)).upper(), m.group(3)
 
 
 @router.get("/residentes")
 def buscar_residentes(
     q: str = "",
-    guard: User = Depends(require_api("guarda")),
+    user: User = Depends(require_api("guarda", "piscina", "admin")),
     db: Session = Depends(get_db),
 ):
     query = db.query(User).filter(User.role == "residente", User.active.is_(True))
     q = q.strip()
     users = []
     if q:
-        m = TORRE_APTO_RE.match(q)
-        if m:
+        destino = parse_torre_apto(q)
+        if destino:
             # destino exacto: torre Y apartamento, nunca uno solo
-            torre = (m.group(1) or m.group(2)).upper()
-            apto = m.group(3)
+            torre, apto = destino
             query = query.filter(func.upper(User.tower) == torre, User.apartment.ilike(apto))
             users = query.order_by(User.apartment, User.username).limit(10).all()
         else:
