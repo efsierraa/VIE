@@ -24,11 +24,11 @@ Para VIE el marco de referencia práctico es doble:
 |---|---|---|
 | Claves con hash bcrypt (nunca en texto plano) | `app/auth.py` | CC6.1 |
 | Sesiones firmadas: HttpOnly, SameSite=Lax, Secure en producción, expiración 12 h | `app/auth.py` | CC6.1 |
-| Autorización por rol (admin/guarda/residente) y por propietario del recurso — sin IDOR: residente solo accede a sus visitas/paquetes | `app/auth.py`, routers | CC6.2, CC6.3 |
+| Autorización por rol (admin/guarda/residente/piscina) y por propietario del recurso — sin IDOR: residente solo accede a sus visitas/paquetes; el rol piscina solo registra entradas y salidas del área común | `app/auth.py`, routers | CC6.2, CC6.3 |
 | QR firmados con HMAC; **sal separada por dominio** (visita ≠ paquete); un solo uso verificado en BD; vigencia en BD, no en el papel | `app/security.py`, `api.py` | CC6.1, CC6.7 |
 | Consultas parametrizadas con ORM (sin inyección SQL); SQL crudo solo en migraciones con cadenas fijas | `app/database.py`, `main.py` | CC7.1 |
 | HTTPS obligatorio (Render) + cookies Secure en producción + TLS hacia la base (Neon `sslmode=require`) | `render.yaml`, `database.py` | CC6.6 |
-| Datos mínimos: identificación del visitante opcional; visitantes no crean cuentas | `api.py` | C8.1 (privacidad) |
+| Datos mínimos: identificación del visitante opcional; visitantes no crean cuentas; el rol piscina se crea sin torre ni apartamento | `api.py` | C8.1 (privacidad) |
 | Retención: fotos de paquetes entregados se borran a los 30 días (automático); registros sin datos sensibles permanecen auditables | `api.py::limpiar_fotos_vencidas` | C8.1 |
 | Secretos por variables de entorno, nunca en el repo; `generateValue` en Render | `security.py`, `render.yaml` | CC6.1 |
 | Plan de contingencia operativo si el servicio cae (método manual de siempre) | `pitch.md`, README | A1.3 (disponibilidad) |
