@@ -39,7 +39,7 @@ from app.models import (
     Visit,
     User,
 )
-from app.routers.api import TORRE_APTO_RE, qr_data_uri, texto_recordatorio_paquetes
+from app.routers.api import parse_torre_apto, qr_data_uri, texto_recordatorio_paquetes
 from app.security import sign_package
 from app.utils import BOGOTA, format_duration, utcnow
 
@@ -654,10 +654,10 @@ def piscina_page(
     if q.strip():
         texto = q.strip()
         condiciones = []
-        m = TORRE_APTO_RE.match(texto)
-        if m:
-            torre = (m.group(1) or m.group(2)).upper()
-            condiciones.append(and_(PoolAccess.tower == torre, PoolAccess.apartment.ilike(m.group(3))))
+        destino = parse_torre_apto(texto)
+        if destino:
+            torre, apto = destino
+            condiciones.append(and_(PoolAccess.tower == torre, PoolAccess.apartment.ilike(apto)))
         for token in [t for t in texto.split() if not t.isdigit()]:
             like = f"%{token}%"
             por_nombre = or_(PoolAccess.menor_nombre.ilike(like), PoolAccess.invitado_nombre.ilike(like))

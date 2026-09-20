@@ -545,3 +545,18 @@ def test_contador_salida_sin_duplicar(client):
     page = client.get("/piscina").text
     assert "Salir con 1" in page
     assert "Salir con 2" not in page
+
+
+def test_parse_torre_apto_es_lineal_y_valida_variantes():
+    """El destino T4 1005 / 4-1005 / T4.1005 se parsea aparte: el patrón es lineal
+    (sin ReDoS, ver CodeQL) y el apto debe traer al menos un dígito."""
+    from app.routers.api import parse_torre_apto
+
+    assert parse_torre_apto("T4 1005") == ("4", "1005")
+    assert parse_torre_apto("4-1005") == ("4", "1005")
+    assert parse_torre_apto("t4.1005") == ("4", "1005")
+    assert parse_torre_apto("4 10A5") == ("4", "10A5")
+    assert parse_torre_apto("1005") is None  # apto solo
+    assert parse_torre_apto("T4") is None  # torre sola
+    assert parse_torre_apto("4 abcd") is None  # apto sin dígitos
+    assert parse_torre_apto("4 " + "0" * 100_000) is None  # cota de largo: no explota

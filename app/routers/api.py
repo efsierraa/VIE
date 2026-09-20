@@ -1382,7 +1382,21 @@ def foto_paquete(
 
 
 # Torre y apto juntos: "T4 1005", "4 1005", "4-1005", "t4.1005". El apto siempre lleva dígitos.
-TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-z0-9]*\d[A-Za-z0-9]*)$", re.IGNORECASE)
+# Patrón lineal a propósito: `([A-Za-z0-9]*\d[A-Za-z0-9]*)` es ambiguo y CodeQL lo marcó como
+# polinómico (ReDoS) sobre la búsqueda del usuario. El "apto con al menos un dígito" se
+# verifica con `any(...isdigit())` en `parse_torre_apto`.
+TORRE_APTO_RE = re.compile(r"^(?:t([A-Za-z0-9]{1,3})|(\d{1,3}))[\s\-_.#]+([A-Za-z0-9]+)$", re.IGNORECASE)
+MAX_LARGO_BUSQUEDA = 60  # cota defensiva: ninguna búsqueda legítima de destino supera esto
+
+
+def parse_torre_apto(texto: str) -> tuple[str, str] | None:
+    """Devuelve (torre, apto) para un destino tipo T4 1005 / 4-1005 / T4.1005, o None."""
+    if not texto or len(texto) > MAX_LARGO_BUSQUEDA:
+        return None
+    m = TORRE_APTO_RE.match(texto)
+    if not m or not any(c.isdigit() for c in m.group(3)):
+        return None
+    return (m.group(1) or m.group(2)).upper(), m.group(3)
 
 
 @router.get("/residentes")
@@ -1395,11 +1409,10 @@ def buscar_residentes(
     q = q.strip()
     users = []
     if q:
-        m = TORRE_APTO_RE.match(q)
-        if m:
+        destino = parse_torre_apto(q)
+        if destino:
             # destino exacto: torre Y apartamento, nunca uno solo
-            torre = (m.group(1) or m.group(2)).upper()
-            apto = m.group(3)
+            torre, apto = destino
             query = query.filter(func.upper(User.tower) == torre, User.apartment.ilike(apto))
             users = query.order_by(User.apartment, User.username).limit(10).all()
         else:
