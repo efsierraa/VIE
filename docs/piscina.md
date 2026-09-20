@@ -1,45 +1,39 @@
 # Piscina: entradas y salidas con acompañante
 
-Rol `piscina` (guarda de piscina). Registra quién está dentro del área, con una
-regla que sostiene todo el flujo: **un adulto residente entra solo; los niños
-nunca entran ni salen solos**, siempre ligados a su acompañante.
+Rol `piscina` (guarda de piscina). Registra quién está dentro del área. Una
+regla sostiene el flujo: **un adulto residente entra solo; los niños nunca
+entran ni salen solos**, siempre ligados a su acompañante.
 
 ## Reglas de negocio
 
 - **Entra un adulto residente.** Solo residentes activos con torre y apartamento
-  (`_residente_piscina` en `app/routers/api.py`). El invitado no es un residente
-  dentro: es una fila aparte ligada a un residente *padrino*.
+  (`_residente_piscina`, `app/routers/api.py`). El invitado es una fila aparte
+  ligada a un residente *padrino*.
 - **Los niños entran con un adulto.** Cada niño se registra con **nombres y
-  apellidos** (y edad opcional, 0-17) y queda ligado a la fila del adulto con
-  `acompanante_acceso_id`. Varios niños por adulto, hasta `MAX_NINOS_PISCINA`
-  (10 por registro).
-- **Los niños salen con su adulto.** Al marcar la salida del acompañante salen
-  también sus niños en un solo movimiento.
-- **Invitados.** Un invitado adulto (con nombres y apellidos) queda ligado a un
-  residente **padrino** (`resident_id`), puede traer sus propios niños y su
-  destino es la residencia del padrino. El padrino puede estar dentro o no: el
-  invitado no lo representa.
-- **Una sola entrada por persona.** No se ingresa a alguien que ya está dentro:
-  adulto, niño (mismo nombre con su acompañante) o invitado (mismo nombre
-  completo). El niño tampoco se duplica dentro del mismo grupo.
+  apellidos** (edad opcional, 0-17) y queda ligado a la fila del adulto con
+  `acompanante_acceso_id`. Hasta 10 niños por registro (`MAX_NINOS_PISCINA`).
+- **Invitados.** Un invitado adulto queda ligado a un residente **padrino**
+  (`resident_id`). Puede traer sus propios niños y su destino es la residencia
+  del padrino. El padrino esté dentro o no, el invitado no lo representa.
+- **Una entrada por persona.** No se ingresa a quien ya está dentro: adulto,
+  niño (mismo nombre con su acompañante) o invitado (mismo nombre completo).
 
 ## Salida
 
 - El **niño no puede salir solo**: `POST /piscina/salida/{fila_id}` sobre una
   fila de niño responde **400** ("usa su salida en grupo").
-- La salida de un adulto o invitado cierra su grupo: la fila propia **más sus
-  niños abiertos** (`acompanante_acceso_id == fila.id`), todos con la misma hora
-  y el mismo guarda de salida.
-- Invitado y residente son independientes: el invitado sale con sus niños sin
-  tocar la fila del padrino, y viceversa.
+- La salida de un adulto o invitado cierra su grupo: su fila más sus **niños
+  abiertos** (`acompanante_acceso_id == fila.id`), con la misma hora y el mismo
+  guarda.
+- Invitado y residente son independientes: cada uno sale con sus niños sin tocar
+  la fila del otro.
 
 ## Validaciones
 
-- Nombres y apellidos obligatorios (adulto/invitado y niños); largo máximo por
-  campo. La edad del niño, si se digita, debe estar entre 0 y 17.
-- No se ingresa a quien ya está dentro (ver arriba).
-- El acompañante/padrino debe ser un residente activo con torre y apartamento.
-- Ingresos concurrentes del mismo residente se serializan con `FOR UPDATE`, así
+- Nombres y apellidos obligatorios (adulto, invitado y niños), con largo máximo.
+  La edad del niño, si se digita, va entre 0 y 17.
+- El acompañante o padrino debe ser un residente activo con torre y apartamento.
+- Los ingresos concurrentes del mismo residente se serializan con `FOR UPDATE`:
   un doble toque no crea filas duplicadas.
 
 ## Páginas y endpoints
@@ -86,9 +80,9 @@ El dashboard admin muestra el contador de personas actualmente en piscina.
 ## Creación de cuentas del rol
 
 El rol `piscina` se crea desde **Administración → Cuentas** o importando CSV.
-Como no habita una unidad, se crea **sin torre ni apartamento** (solo residentes
-los requieren; ver `_crear_usuario`). El CSV de ejemplo ya incluye un usuario
-piscina (`app/static/ejemplo_usuarios.csv`) y el formato está en el README.
+No habita una unidad, así que se crea **sin torre ni apartamento** (solo los
+residentes los requieren; ver `_crear_usuario`). El CSV de ejemplo ya incluye un
+usuario piscina (`app/static/ejemplo_usuarios.csv`) y el formato está en el README.
 
 ## Relación con otras reglas
 
